@@ -1,0 +1,21 @@
+.env
+.env.*
+.env.local
+node_modules/
+vendor/
+__pycache__/
+dist/
+build/
+.next/
+.claude/settings.local.json
+CLAUDE.local.md
+docs/.generated.*
+
+# runtime state
+data/
+.data/
+*.sqlite
+*.sqlite3
+snapshots/
+tmp/
+downloads/

@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>yoto-manager - prototype</title>
+<style>
+  :root {
+    --bg: #f4f4f2;
+    --panel: #ffffff;
+    --rail: #1b1c1f;
+    --rail-2: #24262a;
+    --rail-line: #34363b;
+    --ink: #1b1c1f;
+    --ink-2: #5c5f66;
+    --ink-3: #8b8e96;
+    --line: #dcdcd7;
+    --line-2: #e9e9e4;
+    --accent: #ee5a1c;
+    --accent-ink: #ffffff;
+    --accent-soft: #fdece2;
+    --sel: #fff3ec;
+    --sel-line: #f3b48c;
+    --danger: #c0392b;
+    --ok: #2e8b57;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Consolas", monospace;
+    --ui: "Segoe UI", -apple-system, system-ui, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: var(--ui);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    display: grid;
+    grid-template-columns: 264px 1fr;
+    grid-template-rows: 44px 1fr;
+    height: 100vh;
+  }
+
+  /* ---- top bar ---- */
+  .topbar {
+    grid-column: 1 / 3;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    background: var(--rail);
+    color: #e9e9ea;
+    border-bottom: 1px solid #000;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 9px;
+    font-weight: 700; letter-spacing: .02em; font-size: 13px;
+  }
+  .brand .dot {
+    width: 15px; height: 15px; border-radius: 3px;
+    background: var(--accent);
+    box-shadow: inset 0 0 0 2px #1b1c1f, 0 0 0 1px var(--accent);
+  }
+  .brand b { color: #fff; }
+  .brand span { color: #7d818a; font-weight: 500; }
+  .topbar .spacer { flex: 1; }
+  .topbar .who {
+    display: flex; align-items: center; gap: 8px;
+    color: #b9bcc2; font-size: 12px;
+  }
+  .avatar {
+    width: 24px; height: 24px; border-radius: 3px;
+    background: #3a3d43; color: #fff;
+    display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  }
+
+  /* ---- left rail: cards ---- */
+  .rail {
+    background: var(--rail);
+    color: #cfd2d7;
+    border-right: 1px solid #000;
+    display: flex; flex-direction: column;
+    min-height: 0;
+  }
+  .rail-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 12px 8px;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    color: #7d818a; font-weight: 700;
+  }
+  .rail-head .count { color: #52555c; }
+  .rail-search {
+    margin: 0 10px 8px;
+  }
+  .rail-search input {
+    width: 100%; background: var(--rail-2); border: 1px solid var(--rail-line);
+    color: #e9e9ea; border-radius: 3px; padding: 6px 8px; font-size: 12px; font-family: var(--ui);
+  }
+  .rail-search input::placeholder { color: #6b6e75; }
+  .cards { overflow-y: auto; padding: 4px 8px 12px; flex: 1; min-height: 0; }
+  .card-item {
+    display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center;
+    padding: 7px 8px; border-radius: 4px; cursor: pointer; margin-bottom: 2px;
+    border: 1px solid transparent;
+  }
+  .card-item:hover { background: var(--rail-2); }
+  .card-item.active { background: #2b2d32; border-color: var(--rail-line); }
+  .card-item.active .ci-title { color: #fff; }
+  .card-cover {
+    width: 34px; height: 34px; border-radius: 3px; object-fit: cover;
+    background: #000; box-shadow: 0 0 0 1px #000;
+  }
+  .ci-title { font-size: 12.5px; font-weight: 600; color: #d3d6db; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ci-sub { font-size: 11px; color: #7d818a; margin-top: 1px; }
+  .ci-badge {
+    font-family: var(--mono); font-size: 11px; color: #9a9da4;
+    background: #000; border: 1px solid var(--rail-line);
+    border-radius: 10px; padding: 1px 7px;
+  }
+  .card-item.dirty .ci-badge { color: var(--accent); border-color: #4a2c1c; }
+
+  /* ---- main pane ---- */
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); }
+  .pane-head {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 16px; border-bottom: 1px solid var(--line);
+  }
+  .pane-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .pane-title h1 {
+    font-size: 18px; margin: 0; font-weight: 800; letter-spacing: -.01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase;
+  }
+  .pane-title .slug { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .dirtytag {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    background: var(--accent-soft); border: 1px solid var(--sel-line);
+    border-radius: 3px; padding: 2px 7px; display: none;
+  }
+  .dirtytag.show { display: inline-block; }
+  .pane-head .spacer { flex: 1; }
+  .btn {
+    font-family: var(--ui); font-size: 12.5px; font-weight: 600;
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 4px; padding: 7px 12px; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: #f7f7f4; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { background: #d94e14; }
+  .btn.ghost { border-color: transparent; background: transparent; }
+  .btn.ghost:hover { background: #f1f1ec; }
+  .btn.danger { color: var(--danger); }
+  .btn.danger:hover { background: #fbecea; }
+  .ico { width: 14px; height: 14px; display: inline-block; }
+
+  /* ---- toolbar ---- */
+  .toolbar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-bottom: 1px solid var(--line);
+    background: #fbfbf9; min-height: 46px;
+  }
+  .toolbar .grp { display: flex; align-items: center; gap: 4px; }
+  .tb {
+    font-size: 12px; font-weight: 600; color: var(--ink);
+    border: 1px solid var(--line); background: #fff; border-radius: 4px;
+    padding: 6px 9px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tb:hover:not(:disabled) { background: #f2f2ec; border-color: #cfcfc8; }
+  .tb:disabled { opacity: .38; cursor: default; }
+  .tb.warn { color: var(--danger); }
+  .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+  .selinfo { font-size: 12px; color: var(--ink-2); }
+  .selinfo b { color: var(--ink); }
+  .toolbar .spacer { flex: 1; }
+  .searchbox { position: relative; }
+  .searchbox input {
+    font-family: var(--ui); font-size: 12.5px; border: 1px solid var(--line);
+    border-radius: 4px; padding: 6px 10px 6px 28px; width: 200px; background: #fff;
+  }
+  .searchbox .ico { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--ink-3); }
+
+  /* ---- table ---- */
+  .table-wrap { flex: 1; overflow-y: auto; min-height: 0; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    position: sticky; top: 0; z-index: 2; background: #fff;
+    text-align: left; font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 700; padding: 9px 10px;
+    border-bottom: 1px solid var(--line); user-select: none;
+  }
+  thead th.sortable { cursor: pointer; }
+  thead th.sortable:hover { color: var(--ink); }
+  thead th .arrow { color: var(--accent); margin-left: 3px; }
+  th.c-check, td.c-check { width: 34px; padding-left: 14px; }
+  th.c-num, td.c-num { width: 44px; text-align: right; }
+  th.c-icon, td.c-icon { width: 40px; }
+  th.c-dur, td.c-dur, th.c-size, td.c-size { width: 92px; text-align: right; }
+  th.c-dur, td.c-dur { padding-right: 14px; }
+  th.c-size, td.c-size { padding-right: 18px; }
+
+  tbody td { padding: 0 10px; height: 34px; border-bottom: 1px solid var(--line-2); font-size: 13px; }
+  tbody tr:hover { background: #faf9f6; }
+  tbody tr.sel { background: var(--sel); }
+  tbody tr.sel:hover { background: #ffece0; }
+  tbody tr.sel td { border-bottom-color: #f6d9c6; }
+  .t-num { font-family: var(--mono); color: var(--ink-3); font-size: 12px; }
+  .t-title { font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1px; }
+  td.c-title { width: 100%; }
+  .t-dur, .t-size { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+  .t-icon {
+    width: 22px; height: 22px; border-radius: 3px; image-rendering: pixelated;
+    box-shadow: 0 0 0 1px var(--line); display: block;
+  }
+  .t-icon.empty { background: repeating-conic-gradient(#eee 0% 25%, #f7f7f4 0% 50%) 50% / 8px 8px; }
+  input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+
+  /* ---- rename panel ---- */
+  .drawer-back {
+    position: fixed; inset: 0; background: rgba(20,20,22,.34); display: none; z-index: 40;
+  }
+  .drawer-back.show { display: block; }
+  .drawer {
+    position: fixed; top: 0; right: 0; height: 100vh; width: 460px; max-width: 92vw;
+    background: #fff; border-left: 1px solid var(--line); z-index: 50;
+    transform: translateX(100%); transition: transform .16s ease; display: flex; flex-direction: column;
+  }
+  .drawer.show { transform: translateX(0); }
+  .drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .drawer-head h2 { margin: 0; font-size: 15px; font-weight: 800; }
+  .drawer-body { padding: 16px; overflow-y: auto; flex: 1; }
+  .drawer-foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); margin-bottom: 5px; }
+  .field input[type=text], .field input[type=number], .field select {
+    width: 100%; font-family: var(--ui); font-size: 13px; border: 1px solid var(--line);
+    border-radius: 4px; padding: 8px 10px; background: #fff;
+  }
+  .field .row { display: flex; gap: 8px; }
+  .field .row > * { flex: 1; }
+  .tabset { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+  .tabset button { border: none; background: none; padding: 8px 12px; font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabset button.on { color: var(--accent); border-bottom-color: var(--accent); }
+  .preview { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .preview .pv-row { display: grid; grid-template-columns: 1fr 16px 1fr; gap: 8px; align-items: center; padding: 6px 10px; font-size: 12px; border-bottom: 1px solid var(--line-2); }
+  .preview .pv-row:last-child { border-bottom: none; }
+  .preview .old { color: var(--ink-3); text-decoration: line-through; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .preview .arw { color: var(--ink-3); }
+  .preview .new { color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .preview .new.err { color: var(--danger); font-weight: 500; }
+  .hint { font-size: 11.5px; color: var(--ink-3); margin-top: 5px; line-height: 1.4; }
+  .mono { font-family: var(--mono); }
+
+  /* ---- icon picker ---- */
+  .iconpick { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .iconpick .ip {
+    aspect-ratio: 1; border-radius: 4px; border: 1px solid var(--line); background: #fff;
+    display: grid; place-items: center; cursor: pointer; font-size: 16px; padding: 0;
+  }
+  .iconpick .ip:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .iconpick .ip.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+  .toast {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--rail); color: #fff; padding: 10px 16px; border-radius: 5px; font-size: 12.5px;
+    opacity: 0; transition: all .2s; z-index: 60; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  kbd { font-family: var(--mono); font-size: 11px; background: #ececea; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; }
+
+  /* ---- capacity meter ---- */
+  .capacity {
+    display: flex; align-items: center; gap: 22px;
+    padding: 8px 18px; border-top: 1px solid var(--line); background: #fbfbf9;
+  }
+  .cap {
+    display: flex; align-items: center; gap: 9px; min-width: 160px;
+  }
+  .cap .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); width: 46px; }
+  .cap .bar { flex: 1; height: 6px; border-radius: 3px; background: #e7e7e1; overflow: hidden; }
+  .cap .fill { height: 100%; background: var(--ok); border-radius: 3px; transition: width .18s, background .18s; }
+  .cap .fill.warn { background: #e0a000; }
+  .cap .fill.over { background: var(--danger); }
+  .cap .val { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); white-space: nowrap; min-width: 96px; text-align: right; }
+  .cap .val.over { color: var(--danger); font-weight: 700; }
+  .cap .val .q { color: var(--ink-3); }
+  .capacity .warnmsg { font-size: 12px; color: var(--danger); font-weight: 600; margin-left: auto; display: none; }
+  .capacity .warnmsg.show { display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- top bar -->
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span><b>yoto</b><span>manager</span></div>
+    <div class="spacer"></div>
+    <div class="who">Patrick G. <span class="avatar">PG</span></div>
+  </div>
+
+  <!-- card rail -->
+  <aside class="rail">
+    <div class="rail-head"><span>My cards</span><span class="count" id="cardCount"></span></div>
+    <div class="rail-search"><input id="cardSearch" placeholder="Filter cards..." /></div>
+    <div class="cards" id="cardList"></div>
+  </aside>
+
+  <!-- main -->
+  <main class="main">
+    <div class="pane-head">
+      <div class="pane-title">
+        <h1 id="cardTitle">—</h1>
+        <span class="slug" id="cardSlug"></span>
+        <span class="dirtytag" id="dirtyTag">● unpublished</span>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="btnDiscard" title="Reload from Yoto, discard local draft">Discard draft</button>
+      <button class="btn" id="btnUndo" title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn primary" id="btnPublish">Publish to Yoto</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="grp">
+        <button class="tb" data-act="top" disabled title="Move to top">⤒ Top</button>
+        <button class="tb" data-act="up" disabled title="Move up (Alt+↑)">↑ Up</button>
+        <button class="tb" data-act="down" disabled title="Move down (Alt+↓)">↓ Down</button>
+        <button class="tb" data-act="bottom" disabled title="Move to bottom">⤓ Bottom</button>
+      </div>
+      <div class="sep"></div>
+      <div class="grp">
+        <button class="tb" data-act="rename" disabled>✎ Rename</button>
+        <button class="tb" data-act="icon" disabled>◧ Set icon</button>
+        <button class="tb warn" data-act="delete" disabled>🗑 Remove</button>
+      </div>
+      <div class="sep"></div>
+      <button class="tb" data-act="upload">⇪ Upload MP3</button>
+      <div class="spacer"></div>
+      <span class="selinfo" id="selInfo">No selection</span>
+      <div class="sep"></div>
+      <div class="searchbox">
+        <span class="ico">⌕</span>
+        <input id="trackSearch" placeholder="Search tracks..." />
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="c-check"><input type="checkbox" id="checkAll" /></th>
+            <th class="c-num sortable" data-sort="index"># <span class="arrow" data-for="index"></span></th>
+            <th class="c-icon">Icon</th>
+            <th class="c-title sortable" data-sort="title">Title <span class="arrow" data-for="title"></span></th>
+            <th class="c-dur sortable" data-sort="duration">Duration <span class="arrow" data-for="duration"></span></th>
+            <th class="c-size sortable" data-sort="size">Size <span class="arrow" data-for="size"></span></th>
+          </tr>
+        </thead>
+        <tbody id="trackBody"></tbody>
+      </table>
+    </div>
+
+    <div class="capacity" id="capacity">
+      <div class="cap"><span class="lbl">Tracks</span><div class="bar"><div class="fill" id="capTrackFill"></div></div><span class="val" id="capTrackVal"></span></div>
+      <div class="cap"><span class="lbl">Time</span><div class="bar"><div class="fill" id="capTimeFill"></div></div><span class="val" id="capTimeVal"></span></div>
+      <div class="cap"><span class="lbl">Size</span><div class="bar"><div class="fill" id="capSizeFill"></div></div><span class="val" id="capSizeVal"></span></div>
+      <div class="warnmsg" id="capWarn"></div>
+    </div>
+  </main>
+</div>
+
+<!-- rename / icon drawer -->
+<div class="drawer-back" id="drawerBack"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h2 id="drawerTitle">Rename</h2>
+    <button class="btn ghost" id="drawerClose">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-foot">
+    <button class="btn ghost" id="drawerCancel">Cancel</button>
+    <button class="btn primary" id="drawerApply">Apply</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- mock data ----------
+const COVERS = {
+  sharky: "data:image/svg+xml;utf8," + encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><rect width='80' height='80' fill='#0a0a0a'/><g fill='#e8b04b'><circle cx='40' cy='30' r='13'/><rect x='30' y='40' width='20' height='30' rx='4'/></g><rect x='34' y='18' width='12' height='6' fill='#c0392b'/></svg>`),
+  bibi: "data:image/svg+xml;utf8," + encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><rect width='80' height='80' fill='#1e3a5f'/><circle cx='40' cy='34' r='14' fill='#f2c14e'/><rect x='24' y='52' width='32' height='16' rx='3' fill='#e74c3c'/></svg>`),
+  benjamin: "data:image/svg+xml;utf8," + encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><rect width='80' height='80' fill='#3b6e3b'/><circle cx='40' cy='40' r='20' fill='#9a9a9a'/><rect x='30' y='20' width='20' height='16' rx='6' fill='#7a7a7a'/></svg>`),
+};
+const EMOJI = ["🎵","🏴‍☠️","🦜","⚓","🗺️","🎸","🥁","🌊","⭐","🎤","🐘","🐝","🚓","🔍","🦸","🎺","🌈","🔔"];
+
+function pixIcon(emoji, i){
+  const bg = ["#1c2b4a","#3a1c2b","#1c3a2b","#3a331c","#2b1c3a"][i%5];
+  return "data:image/svg+xml;utf8," + encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><rect width='16' height='16' fill='${bg}'/><text x='8' y='13' font-size='12' text-anchor='middle'>${emoji}</text></svg>`);
+}
+
+let uid = 1;
+function tr(title, sec, kb, emoji){
+  return { key: String(uid).padStart(2,"0"), uid: "u"+(uid++), title, duration: sec, size: Math.round(kb*1024),
+    icon: emoji ? pixIcon(emoji, uid) : null, emoji: emoji||null };
+}
+
+const CARDS = [
+  { id:"sHrk1", title:"Sharky", slug:"sharky-piraten", cover:COVERS.sharky, dirty:false, tracks:[
+      tr("Eva mit Gitarre - Pipikaka-Automat", 183, 2140, "🎸"),
+      tr("Glu-Glu-Lied 2018", 145, 1188, "🎤"),
+      tr("robin_hood.mp3", 30, 378, null),
+      tr("Der geheimnisvolle Smaragdeisbecher 1", 53, 594, null),
+      tr("Der geheimnisvolle Smaragdeisbecher 2", 59, 728, null),
+      tr("Der geheimnisvolle Smaragdeisbecher 3", 186, 1485, null),
+      tr("Kapitel 20: Einer fuer alle", 91, 1054, "🏴‍☠️"),
+      tr("Kapitel 21: Einer fuer alle", 90, 1075, "🏴‍☠️"),
+      tr("Kapitel 22: Einer fuer alle", 91, 731, "🏴‍☠️"),
+      tr("Outro: Einer fuer alle, alle fuer einen", 71, 472, "⚓"),
+      tr("Manchmal (Lied)", 124, 985, "🎵"),
+      tr("Sharkys Piratenlied (Lied)", 147, 1140, "🦜"),
+  ]},
+  { id:"bibi2", title:"Bibi Blocksberg", slug:"bibi-hexerei", cover:COVERS.bibi, dirty:false, tracks:[
+      tr("Folge 1 - Die Zauberlimonade", 1380, 12400, "🧹"),
+      tr("Folge 2 - Der Hexengeburtstag", 1420, 12900, "🧹"),
+      tr("Titelsong", 92, 890, "🎵"),
+  ]},
+  { id:"benj3", title:"Benjamin Bluemchen", slug:"benjamin-zoo", cover:COVERS.benjamin, dirty:false, tracks:[
+      tr("Benjamin als Pilot", 1650, 15200, "🐘"),
+      tr("Toeroeoe-Lied", 88, 810, "🎺"),
+      tr("Benjamin und Otto", 1590, 14800, "🐘"),
+  ]},
+];
+
+// ---------- state ----------
+let activeId = CARDS[0].id;
+let selected = new Set();      // uids
+let lastClickIdx = null;
+let sortKey = "index", sortDir = 1;
+let trackFilter = "";
+const undoStack = [];
+
+const $ = s => document.querySelector(s);
+const active = () => CARDS.find(c => c.id === activeId);
+
+function snapshot(){
+  const c = active();
+  undoStack.push(JSON.stringify(c.tracks));
+  if (undoStack.length > 50) undoStack.shift();
+}
+function markDirty(){ active().dirty = true; renderCards(); updateHeader(); }
+
+// ---------- render: card rail ----------
+function fmtDur(s){ const m = Math.floor(s/60); const ss = s%60; return m+"m "+String(ss).padStart(2,"0")+"s"; }
+function fmtSize(b){ const mb = b/1048576; return mb>=1 ? mb.toFixed(2)+" MB" : Math.round(b/1024)+" KB"; }
+function cardTotalDur(c){ return c.tracks.reduce((a,t)=>a+t.duration,0); }
+
+function renderCards(){
+  const q = $("#cardSearch").value.toLowerCase();
+  const list = CARDS.filter(c => c.title.toLowerCase().includes(q));
+  $("#cardCount").textContent = CARDS.length;
+  $("#cardList").innerHTML = list.map(c => `
+    <div class="card-item ${c.id===activeId?"active":""} ${c.dirty?"dirty":""}" data-id="${c.id}">
+      <img class="card-cover" src="${c.cover}" alt="">
+      <div style="min-width:0">
+        <div class="ci-title">${esc(c.title)}</div>
+        <div class="ci-sub">${c.tracks.length} tracks · ${Math.round(cardTotalDur(c)/60)} min</div>
+      </div>
+      <span class="ci-badge">${c.dirty?"●":c.tracks.length}</span>
+    </div>`).join("");
+  document.querySelectorAll(".card-item").forEach(el =>
+    el.onclick = () => openCard(el.dataset.id));
+}
+
+function openCard(id){
+  if (id === activeId) return;
+  activeId = id; selected.clear(); lastClickIdx = null; sortKey="index"; sortDir=1;
+  trackFilter=""; $("#trackSearch").value="";
+  undoStack.length = 0;
+  renderAll();
+}
+
+// ---------- render: tracks ----------
+function viewTracks(){
+  const c = active();
+  let rows = c.tracks.map((t,i)=>({t, index:i}));
+  if (trackFilter) rows = rows.filter(r => r.t.title.toLowerCase().includes(trackFilter));
+  if (sortKey !== "index"){
+    rows = rows.slice().sort((a,b)=>{
+      let x,y;
+      if (sortKey==="title"){ x=a.t.title.toLowerCase(); y=b.t.title.toLowerCase(); return x<y?-1*sortDir:x>y?1*sortDir:0; }
+      x=a.t[sortKey]; y=b.t[sortKey]; return (x-y)*sortDir;
+    });
+  } else if (sortDir===-1){ rows = rows.slice().reverse(); }
+  return rows;
+}
+
+function renderTracks(){
+  const rows = viewTracks();
+  $("#trackBody").innerHTML = rows.map(r => {
+    const t = r.t; const s = selected.has(t.uid);
+    const icon = t.icon
+      ? `<img class="t-icon" src="${t.icon}">`
+      : `<span class="t-icon empty" title="no icon"></span>`;
+    return `<tr class="${s?"sel":""}" data-uid="${t.uid}" data-idx="${r.index}">
+      <td class="c-check"><input type="checkbox" ${s?"checked":""}></td>
+      <td class="c-num"><span class="t-num">${r.index+1}</span></td>
+      <td class="c-icon">${icon}</td>
+      <td class="c-title"><span class="t-title">${esc(t.title)}</span></td>
+      <td class="c-dur"><span class="t-dur">${fmtDur(t.duration)}</span></td>
+      <td class="c-size"><span class="t-size">${fmtSize(t.size)}</span></td>
+    </tr>`;
+  }).join("");
+
+  document.querySelectorAll("#trackBody tr").forEach((row)=>{
+    const uid = row.dataset.uid;
+    const visIdx = [...row.parentNode.children].indexOf(row);
+    row.querySelector("input").onclick = (e)=>{ e.stopPropagation(); toggleSel(uid, visIdx, e.shiftKey); };
+    row.onclick = (e)=>{ if(e.target.tagName!=="INPUT") toggleSel(uid, visIdx, e.shiftKey, !e.ctrlKey&&!e.metaKey); };
+  });
+  updateSortArrows();
+  updateToolbar();
+  renderCapacity();
+}
+
+// ---------- capacity meter (mirrors src/lib/yotoLimits.ts) ----------
+const LIM = { tracks:100, trackSec:3600, trackByte:100*1048576, cardSec:5*3600, cardByte:500*1048576 };
+function capState(ratio){ return ratio>1 ? "over" : ratio>0.9 ? "warn" : ""; }
+function renderCapacity(){
+  const c = active();
+  const nTracks = c.tracks.length;
+  const totSec = c.tracks.reduce((a,t)=>a+(t.duration||0),0);
+  const totByte = c.tracks.reduce((a,t)=>a+(t.size||0),0);
+  const set = (fill,val,cur,max,fmtCur,fmtMax)=>{
+    const r = cur/max;
+    const f = $(fill), v = $(val);
+    f.style.width = Math.min(100, r*100) + "%";
+    f.className = "fill " + capState(r);
+    v.className = "val " + (r>1?"over":"");
+    v.innerHTML = fmtCur + ` <span class="q">/ ${fmtMax}</span>`;
+  };
+  set("#capTrackFill","#capTrackVal", nTracks, LIM.tracks, String(nTracks), "100");
+  set("#capTimeFill","#capTimeVal", totSec, LIM.cardSec, capDur(totSec), "5h");
+  set("#capSizeFill","#capSizeVal", totByte, LIM.cardByte, (totByte/1048576).toFixed(0)+" MB", "500");
+  // preflight message
+  let msg = "";
+  if (nTracks > LIM.tracks) msg = "Over 100-track limit";
+  else { const over = c.tracks.find(t=>(t.duration>LIM.trackSec)||(t.size>LIM.trackByte)); if(over) msg = `"${over.title.slice(0,28)}" over per-track limit`; }
+  if (!msg && totSec>LIM.cardSec) msg = "Over 5h card limit";
+  if (!msg && totByte>LIM.cardByte) msg = "Over 500 MB card limit";
+  const w = $("#capWarn"); w.textContent = msg ? "⚠ "+msg : ""; w.classList.toggle("show", !!msg);
+  $("#btnPublish").title = msg ? "Fix capacity before publishing" : "";
+}
+function capDur(s){ const h=Math.floor(s/3600), m=Math.floor((s%3600)/60); return h<=0?`${m}m`:m<=0?`${h}h`:`${h}h ${String(m).padStart(2,"0")}m`; }
+
+function toggleSel(uid, visIdx, shift, exclusive){
+  const rows = viewTracks();
+  if (shift && lastClickIdx!==null){
+    const [a,b] = [lastClickIdx, visIdx].sort((x,y)=>x-y);
+    for(let i=a;i<=b;i++) selected.add(rows[i].t.uid);
+  } else if (exclusive){
+    const wasOnly = selected.size===1 && selected.has(uid);
+    selected.clear(); if(!wasOnly) selected.add(uid);
+    lastClickIdx = visIdx;
+  } else {
+    selected.has(uid) ? selected.delete(uid) : selected.add(uid);
+    lastClickIdx = visIdx;
+  }
+  renderTracks();
+}
+
+function updateSortArrows(){
+  document.querySelectorAll(".arrow").forEach(a => a.textContent="");
+  const a = document.querySelector(`.arrow[data-for="${sortKey}"]`);
+  if (a) a.textContent = sortDir===1 ? "▲" : "▼";
+}
+
+function updateToolbar(){
+  const n = selected.size;
+  const move = document.querySelectorAll('[data-act="top"],[data-act="up"],[data-act="down"],[data-act="bottom"],[data-act="rename"],[data-act="icon"],[data-act="delete"]');
+  move.forEach(b => b.disabled = n===0);
+  $("#selInfo").innerHTML = n===0 ? "No selection" : `<b>${n}</b> selected`;
+  const c = active();
+  $("#checkAll").checked = n>0 && n===c.tracks.length;
+  $("#checkAll").indeterminate = n>0 && n<c.tracks.length;
+}
+
+// ---------- reorder ops (operate on real array order) ----------
+function selectedIndices(){
+  const c = active();
+  return c.tracks.map((t,i)=>selected.has(t.uid)?i:-1).filter(i=>i>=0);
+}
+function requireNaturalOrder(){
+  if (sortKey!=="index"){
+    sortKey="index"; sortDir=1;
+    toast("Sorted view committed to order before moving");
+  }
+}
+function move(act){
+  if (selected.size===0) return;
+  requireNaturalOrder();
+  snapshot();
+  const c = active();
+  const picked = c.tracks.filter(t=>selected.has(t.uid));
+  const rest = c.tracks.filter(t=>!selected.has(t.uid));
+  const idxs = selectedIndices();
+  if (act==="top"){ c.tracks = [...picked, ...rest]; }
+  else if (act==="bottom"){ c.tracks = [...rest, ...picked]; }
+  else if (act==="up"){
+    const arr = c.tracks.slice();
+    for (const i of idxs){ if(i>0 && !selected.has(arr[i-1].uid)){ [arr[i-1],arr[i]]=[arr[i],arr[i-1]]; } }
+    c.tracks = arr;
+  } else if (act==="down"){
+    const arr = c.tracks.slice();
+    for (const i of idxs.slice().reverse()){ if(i<arr.length-1 && !selected.has(arr[i+1].uid)){ [arr[i+1],arr[i]]=[arr[i],arr[i+1]]; } }
+    c.tracks = arr;
+  }
+  markDirty(); renderTracks();
+}
+
+function sortBy(key){
+  if (sortKey===key){ sortDir = -sortDir; }
+  else { sortKey = key; sortDir = 1; }
+  renderTracks();
+}
+
+function del(){
+  if (selected.size===0) return;
+  snapshot();
+  const c = active();
+  c.tracks = c.tracks.filter(t=>!selected.has(t.uid));
+  selected.clear();
+  markDirty(); renderTracks();
+}
+
+function undo(){
+  if (!undoStack.length){ toast("Nothing to undo"); return; }
+  active().tracks = JSON.parse(undoStack.pop());
+  selected.clear();
+  renderTracks(); renderCards(); updateHeader();
+}
+
+// ---------- header ----------
+function updateHeader(){
+  const c = active();
+  $("#cardTitle").textContent = c.title;
+  $("#cardSlug").textContent = c.slug;
+  $("#dirtyTag").classList.toggle("show", c.dirty);
+  $("#btnPublish").disabled = !c.dirty;
+  $("#btnDiscard").disabled = !c.dirty;
+  $("#btnUndo").disabled = undoStack.length===0;
+}
+
+function renderAll(){ renderCards(); renderTracks(); updateHeader(); }
+
+// ---------- drawer: rename & icon ----------
+let drawerMode = null;
+function openDrawer(mode){
+  drawerMode = mode;
+  $("#drawer").classList.add("show");
+  $("#drawerBack").classList.add("show");
+  if (mode==="rename"){ $("#drawerTitle").textContent = `Rename ${selected.size} track(s)`; buildRename(); }
+  else { $("#drawerTitle").textContent = `Set icon on ${selected.size} track(s)`; buildIcon(); }
+}
+function closeDrawer(){ $("#drawer").classList.remove("show"); $("#drawerBack").classList.remove("show"); drawerMode=null; }
+
+let renameTab = "number";
+let iconPick = null;
+
+function selTracksInOrder(){
+  const c = active();
+  return c.tracks.filter(t=>selected.has(t.uid));
+}
+
+function buildRename(){
+  $("#drawerBody").innerHTML = `
+    <div class="tabset">
+      <button data-tab="number" class="${renameTab==="number"?"on":""}">Auto-number</button>
+      <button data-tab="regex" class="${renameTab==="regex"?"on":""}">Regex replace</button>
+    </div>
+    <div id="renameControls"></div>
+    <div class="field"><label>Preview</label><div class="preview" id="renamePreview"></div></div>`;
+  document.querySelectorAll(".tabset button").forEach(b=> b.onclick=()=>{ renameTab=b.dataset.tab; buildRename(); });
+  renderRenameControls();
+}
+function renderRenameControls(){
+  const box = $("#renameControls");
+  if (renameTab==="number"){
+    box.innerHTML = `
+      <div class="field"><label>Pattern</label>
+        <input type="text" id="rnPattern" value="{n}. {title}">
+        <div class="hint"><span class="mono">{n}</span> = number, <span class="mono">{title}</span> = current title. Also sets the app number badge (overlayLabel).</div>
+      </div>
+      <div class="field"><div class="row">
+        <div><label>Start at</label><input type="number" id="rnStart" value="1"></div>
+        <div><label>Step</label><input type="number" id="rnStep" value="1"></div>
+        <div><label>Pad width</label><input type="number" id="rnPad" value="2"></div>
+      </div></div>`;
+  } else {
+    box.innerHTML = `
+      <div class="field"><label>Find (regex)</label><input type="text" id="rnFind" value="Kapitel (\\d+): (.*)"></div>
+      <div class="field"><label>Replace</label><input type="text" id="rnRepl" value="Ch. $1 — $2">
+        <div class="hint">JS regex. Use <span class="mono">$1 $2</span> for capture groups. Global, case-sensitive.</div>
+      </div>`;
+  }
+  box.querySelectorAll("input").forEach(i=> i.oninput = renderRenamePreview);
+  renderRenamePreview();
+}
+function computeRename(){
+  const tracks = selTracksInOrder();
+  if (renameTab==="number"){
+    const pat = $("#rnPattern").value;
+    let n = parseInt($("#rnStart").value)||0;
+    const step = parseInt($("#rnStep").value)||1;
+    const pad = parseInt($("#rnPad").value)||0;
+    return tracks.map(t=>{
+      const num = String(n).padStart(pad,"0"); n+=step;
+      return { t, next: pat.replace(/{n}/g,num).replace(/{title}/g,t.title), err:null };
+    });
+  } else {
+    let re, err=null;
+    try { re = new RegExp($("#rnFind").value, "g"); } catch(e){ err = e.message; }
+    const repl = $("#rnRepl").value;
+    return tracks.map(t=>({ t, next: err?t.title:t.title.replace(re, repl), err }));
+  }
+}
+function renderRenamePreview(){
+  const res = computeRename();
+  $("#renamePreview").innerHTML = res.slice(0,30).map(r=>`
+    <div class="pv-row">
+      <span class="old">${esc(r.t.title)}</span>
+      <span class="arw">→</span>
+      <span class="new ${r.err?"err":""}">${esc(r.err ? "⚠ "+r.err : r.next)}</span>
+    </div>`).join("") + (res.length>30?`<div class="pv-row"><span class="hint">+${res.length-30} more…</span></div>`:"");
+}
+function applyRename(){
+  const res = computeRename();
+  if (res.some(r=>r.err)){ toast("Fix the regex first"); return; }
+  snapshot();
+  res.forEach((r,i)=>{ r.t.title = r.next; if(renameTab==="number") r.t.overlayLabel = String(i+1); });
+  markDirty(); renderTracks(); closeDrawer(); toast(`Renamed ${res.length} track(s)`);
+}
+
+function buildIcon(){
+  iconPick = null;
+  $("#drawerBody").innerHTML = `
+    <div class="field"><label>Pick one icon for all selected</label>
+      <div class="iconpick" id="iconGrid"></div>
+    </div>
+    <div class="hint">In the real app this is the Yoto public icon library + your uploads, searchable. Choosing sets <span class="mono">display.icon16x16</span> on every selected track.</div>`;
+  $("#iconGrid").innerHTML = EMOJI.map((e,i)=>`<button class="ip" data-e="${e}" data-i="${i}">${e}</button>`).join("");
+  document.querySelectorAll(".ip").forEach(b=> b.onclick=()=>{
+    document.querySelectorAll(".ip").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); iconPick = {e:b.dataset.e, i:+b.dataset.i};
+  });
+}
+function applyIcon(){
+  if (!iconPick){ toast("Pick an icon"); return; }
+  snapshot();
+  selTracksInOrder().forEach(t=>{ t.emoji=iconPick.e; t.icon=pixIcon(iconPick.e, iconPick.i); });
+  markDirty(); renderTracks(); closeDrawer(); toast(`Icon set on ${selected.size} track(s)`);
+}
+
+// ---------- publish ----------
+function publish(){
+  const c = active();
+  $("#btnPublish").textContent = "Publishing…"; $("#btnPublish").disabled = true;
+  setTimeout(()=>{
+    c.dirty = false; c.tracks.forEach((t,i)=>t.overlayLabel = t.overlayLabel||String(i+1));
+    undoStack.length = 0;
+    $("#btnPublish").textContent = "Publish to Yoto";
+    renderAll(); toast("Published " + c.tracks.length + " tracks to Yoto");
+  }, 700);
+}
+
+// ---------- misc ----------
+function esc(s){ return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
+let toastT;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1900); }
+
+// ---------- wire up ----------
+$("#cardSearch").oninput = renderCards;
+$("#trackSearch").oninput = e => { trackFilter = e.target.value.toLowerCase(); renderTracks(); };
+$("#checkAll").onclick = e => {
+  const c = active();
+  if (e.target.checked) c.tracks.forEach(t=>selected.add(t.uid)); else selected.clear();
+  renderTracks();
+};
+document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
+  const a = b.dataset.act;
+  if (["top","up","down","bottom"].includes(a)) move(a);
+  else if (a==="delete") del();
+  else if (a==="rename") openDrawer("rename");
+  else if (a==="icon") openDrawer("icon");
+  else if (a==="upload") toast("Upload MP3 → transcode → append (backend job in real app)");
+});
+document.querySelectorAll("th.sortable").forEach(th => th.onclick = () => sortBy(th.dataset.sort));
+$("#btnPublish").onclick = publish;
+$("#btnDiscard").onclick = ()=>{ const c=active(); if(!c.dirty)return; toast("Draft discarded, reloaded from Yoto (mock)"); };
+$("#btnUndo").onclick = undo;
+$("#drawerClose").onclick = closeDrawer;
+$("#drawerCancel").onclick = closeDrawer;
+$("#drawerBack").onclick = closeDrawer;
+$("#drawerApply").onclick = ()=> drawerMode==="rename" ? applyRename() : applyIcon();
+document.addEventListener("keydown", e=>{
+  if ((e.ctrlKey||e.metaKey) && e.key==="z"){ e.preventDefault(); undo(); }
+  if (e.altKey && e.key==="ArrowUp"){ e.preventDefault(); move("up"); }
+  if (e.altKey && e.key==="ArrowDown"){ e.preventDefault(); move("down"); }
+  if (e.key==="Escape") closeDrawer();
+});
+
+renderAll();
+</script>
+</body>
+</html>
