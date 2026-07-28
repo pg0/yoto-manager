@@ -28,9 +28,11 @@ export function TrackTable() {
   const selected = useStore((s) => s.selected);
   const toggleSel = useStore((s) => s.toggleSel);
   const selectAll = useStore((s) => s.selectAll);
+  const clearSel = useStore((s) => s.clearSel);
   const renameOne = useStore((s) => s.renameOne);
   const reorder = useStore((s) => s.reorder);
   const openIconPicker = useStore((s) => s.openIconPicker);
+  const openAudioEditor = useStore((s) => s.openAudioEditor);
   const setTrackEnd = useStore((s) => s.setTrackEnd);
   const setSelectedUids = useStore((s) => s.setSelectedUids);
   const playTrack = useStore((s) => s.playTrack);
@@ -74,16 +76,16 @@ export function TrackTable() {
   const suppressClickRef = useRef(false);
   const [marquee, setMarquee] = useState<{ l: number; t: number; w: number; h: number } | null>(null);
 
-  // Cells that ARE the "item" (drag to reorder). Everything else in a row -
-  // and the blank area below the last row - starts a marquee instead.
-  const ITEM_SEL = '.c-icon, .c-num, .c-title';
-
   function onWrapMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return;
     const el = e.target as HTMLElement;
     if (el.closest('input, button, a, .t-edit')) return; // interactive control
-    if (el.closest(ITEM_SEL)) return; // item cell → leave native reorder drag alone
-    // blank area → own this gesture as a marquee, blocking the native row drag
+    const row = el.closest('tbody tr');
+    const onRow = !!row;
+    // Only an already-SELECTED row keeps its native reorder drag; a drag anywhere
+    // else - blank space OR an unselected row - owns the gesture as a marquee. That
+    // way rubber-band select always works and an unselected title can't be dragged.
+    if (row && row.classList.contains('sel')) return;
     marqueeRef.current = true;
     movedRef.current = false;
     startRef.current = { x: e.clientX, y: e.clientY };
@@ -121,6 +123,10 @@ export function TrackTable() {
         // handler doesn't overwrite the marquee result
         suppressClickRef.current = true;
         setTimeout(() => (suppressClickRef.current = false), 0);
+      } else if (!onRow) {
+        // a plain click on blank space (not a row) clears the selection; a click
+        // on a row is left to the row's own toggle handler
+        clearSel();
       }
       marqueeRef.current = false;
       startRef.current = null;
@@ -129,6 +135,26 @@ export function TrackTable() {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }
+
+  // Ctrl/Cmd+A selects every (visible) track in the playlist, unless the user is
+  // typing in a field - then let the browser select the field's text.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing = el?.closest('input, textarea, [contenteditable="true"], .t-edit');
+      // Escape clears the track selection (but not while typing / a drawer is open)
+      if (e.key === 'Escape' && !typing && !useStore.getState().drawer) {
+        clearSel();
+        return;
+      }
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') return;
+      if (typing) return;
+      e.preventDefault();
+      selectAll(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectAll, clearSel]);
 
   useEffect(() => {
     if (!menu) return;
@@ -373,12 +399,27 @@ export function TrackTable() {
           fn();
           setMenu(null);
         };
+        // flip the menu upward when it's opened near the bottom of the viewport,
+        // otherwise the (now taller) menu is clipped below the fold
+        const flipUp = menu.y > window.innerHeight - 280;
         return (
           <div
             className="rowmenu"
-            style={{ top: menu.y, left: menu.x, transform: 'translateX(-100%)' }}
+            style={{
+              top: menu.y,
+              left: menu.x,
+              transform: `translateX(-100%)${flipUp ? ' translateY(-100%)' : ''}`,
+            }}
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="rm-cap">Audio</div>
+            <button className="rm-item" onClick={act(() => openAudioEditor(menu.uid))}>
+              <span className="rm-lead">
+                <span className="rm-og">✂</span>
+                Edit / cut audio…
+              </span>
+            </button>
+            <div className="rm-sep" />
             <div className="rm-cap">When the track finishes</div>
             {END_OPTS.map((o) => (
               <button

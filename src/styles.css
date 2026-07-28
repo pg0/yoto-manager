@@ -356,6 +356,13 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
    scale makes even image-rendering:pixelated look smoothed). padding sits outside
    the content box, so the image still renders at a clean 48px. */
 .iconpick .ip img { width: 48px; height: 48px; image-rendering: pixelated; display: block; padding: 1px; }
+/* My Icons: delete-select checkbox overlay on each tile */
+.ip-wrap { position: relative; min-width: 0; }
+.ip-wrap .ip { width: 100%; }
+.ip-wrap .ip.delsel { border-color: var(--danger); box-shadow: inset 0 0 0 2px var(--danger); }
+.ip-check { position: absolute; top: 4px; left: 4px; z-index: 2; width: 16px; height: 16px; margin: 0; accent-color: var(--danger); cursor: pointer; opacity: 0; transition: opacity .1s; }
+.ip-wrap:hover .ip-check, .ip-check:checked { opacity: 1; }
+.gh-del { flex: none; }
 
 /* card cover editor (detail header) */
 .pane-cover { position: relative; width: 44px; height: 44px; border-radius: 5px; overflow: hidden; border: 1px solid var(--line); padding: 0; cursor: pointer; background: #000; flex: none; }
@@ -365,6 +372,14 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
 
 /* toast */
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--rail); color: #fff; padding: 10px 16px; border-radius: 5px; font-size: 12.5px; z-index: 60; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+
+/* bare close / delete / remove control - just the glyph, no boxed button */
+.x-btn { border: 0; background: transparent; padding: 2px 6px; font-size: 15px; line-height: 1; color: var(--ink-3); cursor: pointer; border-radius: 5px; display: inline-grid; place-items: center; }
+.x-btn:hover:not(:disabled) { color: var(--ink); background: rgba(0,0,0,.06); }
+.x-btn:disabled { opacity: .4; cursor: default; }
+.x-btn.danger { color: var(--ink-3); }
+.x-btn.danger:hover:not(:disabled) { color: var(--danger); background: rgba(220,53,69,.08); }
+:root[data-theme="dark"] .x-btn:hover:not(:disabled) { background: rgba(255,255,255,.08); }
 
 /* icon-only header button; danger variant tints on hover */
 .btn.icon-btn { display: inline-grid; place-items: center; padding: 6px 8px; }
@@ -392,3 +407,173 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
 .cel-auto { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 12px; font-size: 12px; color: var(--ink-3); cursor: pointer; }
 .cel-auto input { cursor: pointer; }
 @keyframes cel-pop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ============================================================
+   DAY (full-white) THEME - toggled via data-theme="day" on <html>.
+   Default (no attr) = night: dark rail / topbar / player. The day theme
+   flips those surfaces white. Backgrounds mostly follow the --rail* vars;
+   the rest overrides the hardcoded dark text/surfaces.
+   ============================================================ */
+:root[data-theme="day"] {
+  --rail: #ffffff;
+  --rail-2: #f1f1ee;
+  --rail-line: #e4e4de;
+}
+:root[data-theme="day"] .topbar { color: var(--ink); border-bottom-color: var(--line); }
+:root[data-theme="day"] .brand b { color: var(--ink); }
+:root[data-theme="day"] .brand span { color: var(--ink-3); }
+:root[data-theme="day"] .brand .dot { box-shadow: inset 0 0 0 2px #fff, 0 0 0 1px var(--accent); }
+:root[data-theme="day"] .topbar .who { color: var(--ink-2); }
+:root[data-theme="day"] .topbar .who .btn.ghost { color: var(--ink-2); }
+:root[data-theme="day"] .topbar .who .btn.ghost:hover { background: #ececea; color: var(--ink); }
+:root[data-theme="day"] .rail { color: var(--ink-2); border-right-color: var(--line); }
+:root[data-theme="day"] .rail-head, :root[data-theme="day"] .rail-head .count { color: var(--ink-3); }
+:root[data-theme="day"] .rail-search input { color: var(--ink); }
+:root[data-theme="day"] .rail-search input::placeholder { color: var(--ink-3); }
+:root[data-theme="day"] .rail-search .clear-x { color: var(--ink-3); }
+:root[data-theme="day"] .rail-search .clear-x:hover { color: var(--ink); }
+:root[data-theme="day"] .rail-empty, :root[data-theme="day"] .rail-foot { color: var(--ink-3); }
+:root[data-theme="day"] .card-item.active { background: var(--sel); border-color: var(--sel-line); }
+:root[data-theme="day"] .card-item.active .ci-title { color: var(--ink); }
+:root[data-theme="day"] .rail-foot a { color: var(--ink-2); }
+:root[data-theme="day"] .rail-foot .rf-sub { color: var(--ink-3); }
+:root[data-theme="day"] .rail ::-webkit-scrollbar-thumb, :root[data-theme="day"] .rail::-webkit-scrollbar-thumb { background: #c2c4c9; }
+:root[data-theme="day"] .rail *, :root[data-theme="day"] .rail { scrollbar-color: #c2c4c9 transparent; }
+/* player */
+:root[data-theme="day"] .player { background: #fbfbf9; border-top-color: var(--line); }
+:root[data-theme="day"] .pl-title { color: var(--ink); }
+:root[data-theme="day"] .pl-title:hover { color: var(--accent); }
+:root[data-theme="day"] .pl-time, :root[data-theme="day"] .pl-vol, :root[data-theme="day"] .pl-close { color: var(--ink-3); }
+:root[data-theme="day"] .pl-close:hover { color: var(--ink); }
+:root[data-theme="day"] .pl-outbtn { background: #fff; color: var(--ink); border-color: var(--line); }
+:root[data-theme="day"] .pl-outbtn:hover { color: var(--accent); border-color: var(--accent); }
+:root[data-theme="day"] .pl-outmenu { background: #fff; border-color: var(--line); box-shadow: 0 8px 28px rgba(0,0,0,.18); }
+:root[data-theme="day"] .om-sec, :root[data-theme="day"] .om-hint { color: var(--ink-3); }
+:root[data-theme="day"] .om-item { color: var(--ink); }
+:root[data-theme="day"] .om-item:hover { background: var(--accent-soft); color: var(--ink); }
+/* upload toasts */
+:root[data-theme="day"] .up-row { background: #fff; color: var(--ink); border-color: var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.14); }
+:root[data-theme="day"] .up-status { color: var(--ink-3); }
+:root[data-theme="day"] .up-bar { background: #e7e7e1; }
+/* toast keeps a dark chip in both themes for contrast, but soften in day */
+:root[data-theme="day"] .toast { background: #24262a; }
+
+/* theme toggle button (sits in the topbar) */
+.theme-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: #cfd2d7; cursor: pointer; flex: none; }
+.theme-btn:hover { background: rgba(255,255,255,.1); color: #fff; }
+:root[data-theme="day"] .theme-btn { color: var(--ink-2); }
+:root[data-theme="day"] .theme-btn:hover { background: #ececea; color: var(--ink); }
+
+/* ============================================================
+   Yoto box status widget (read-only) in the topbar
+   ============================================================ */
+.dev-widget { display: flex; align-items: center; gap: 8px; }
+.dev-one { position: relative; }
+.dev-pill { display: inline-flex; align-items: center; gap: 7px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); color: #d7dade; border-radius: 999px; padding: 4px 10px 4px 8px; font-size: 12px; cursor: pointer; }
+.dev-pill:hover { background: rgba(255,255,255,.13); }
+:root[data-theme="day"] .dev-pill { background: #f3f3f0; border-color: var(--line); color: var(--ink-2); }
+:root[data-theme="day"] .dev-pill:hover { background: #ececea; }
+.dev-dot { width: 8px; height: 8px; border-radius: 50%; background: #7d818a; flex: none; }
+.dev-dot.on { background: var(--ok); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ok) 35%, transparent); }
+.dev-name { font-weight: 600; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dev-bat { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.dev-bat.low { color: #ffb3ad; }
+:root[data-theme="day"] .dev-bat.low { color: var(--danger); }
+.dev-batbox { position: relative; width: 20px; height: 11px; border: 1px solid currentColor; border-radius: 2px; opacity: .8; }
+.dev-batbox::after { content: ''; position: absolute; right: -3px; top: 3px; width: 2px; height: 5px; background: currentColor; border-radius: 0 1px 1px 0; }
+.dev-batfill { position: absolute; left: 1px; top: 1px; bottom: 1px; background: currentColor; border-radius: 1px; }
+.dev-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 80; min-width: 232px; background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 14px 40px rgba(0,0,0,.24); padding: 12px 14px; }
+.dev-pop-head { display: flex; align-items: baseline; gap: 8px; font-weight: 800; font-size: 14px; margin-bottom: 8px; }
+.dev-type { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); }
+.dev-rows { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 0; font-size: 12.5px; }
+.dev-rows dt { color: var(--ink-3); font-weight: 600; }
+.dev-rows dd { margin: 0; text-align: right; color: var(--ink); }
+.dev-rows dd.ok { color: var(--ok); font-weight: 700; }
+.dev-rows dd.muted { color: var(--ink-3); }
+.dev-note { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line-2); font-size: 11px; color: var(--ink-3); }
+
+/* ============================================================
+   Custom icon upload (own image → 16x16) in the icon drawer
+   ============================================================ */
+.iconup { border: 1px dashed var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.iconup .iu-drop { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 6px; background: #fafaf7; color: var(--ink-2); font-size: 12.5px; cursor: pointer; position: relative; }
+.iconup .iu-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.iconup.dragover .iu-drop { background: var(--accent-soft); color: var(--accent); }
+.iconup .iu-row { display: flex; align-items: center; gap: 16px; }
+.iconup .iu-prev { width: 64px; height: 64px; image-rendering: pixelated; border-radius: 5px; border: 1px solid var(--line); background:
+  linear-gradient(45deg, #e6e8eb 25%, transparent 25%, transparent 75%, #e6e8eb 75%) 0 0/16px 16px,
+  linear-gradient(45deg, #e6e8eb 25%, #fff 25%, #fff 75%, #e6e8eb 75%) 8px 8px/16px 16px, #fff; }
+.iconup .iu-ctrls { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.iconup .iu-slider { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-3); }
+.iconup .iu-slider input { flex: 1; accent-color: var(--accent); }
+
+/* ============================================================
+   Audio trim editor drawer
+   ============================================================ */
+.drawer.audioedit { width: 520px; }
+.ae { display: flex; flex-direction: column; gap: 12px; }
+.ae-wave { width: 100%; height: 120px; display: block; background: #fafaf7; border: 1px solid var(--line); border-radius: 6px; cursor: crosshair; user-select: none; touch-action: none; }
+.ae-help { margin-top: 0; }
+.ae-times { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+.ae-times .ae-keep { color: var(--accent); font-weight: 700; }
+.ae-slider { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink-2); }
+.ae-slider > span { width: 40px; flex: none; font-weight: 600; }
+.ae-slider input { flex: 1; accent-color: var(--accent); }
+.ae-actions { display: flex; gap: 8px; }
+
+/* day-theme: card-list text needs full contrast on white (was tuned for dark rail) */
+:root[data-theme="day"] .ci-title { color: var(--ink); }
+:root[data-theme="day"] .ci-sub { color: var(--ink-3); }
+:root[data-theme="day"] .who-loading { color: var(--ink-3); }
+:root[data-theme="day"] .ci-badge { background: #ececea; color: var(--ink-2); border-color: var(--line); }
+:root[data-theme="day"] .card-item.dirty .ci-badge { color: var(--accent); border-color: var(--sel-line); }
+
+/* ============================================================
+   FULL-DARK THEME - data-theme="dark". Everything dark, including the
+   file-manager panes, table, drawers and modals (the chrome is already dark).
+   Core vars flip most surfaces; the rest overrides hardcoded light backgrounds.
+   ============================================================ */
+:root[data-theme="dark"] {
+  --bg: #131417;
+  --panel: #1c1e22;
+  --ink: #e7e8ea;
+  --ink-2: #b0b3b9;
+  --ink-3: #83868d;
+  --line: #303237;
+  --line-2: #26282c;
+  --accent-soft: #3a271c;
+  --sel: #37281d;
+  --sel-line: #7a4c2a;
+}
+:root[data-theme="dark"] .btn { background: #26282d; }
+:root[data-theme="dark"] .btn:hover:not(:disabled) { background: #303237; }
+:root[data-theme="dark"] .btn.ghost { background: transparent; }
+:root[data-theme="dark"] .btn.ghost:hover:not(:disabled) { background: #26282d; }
+:root[data-theme="dark"] .toolbar { background: #191b1e; }
+:root[data-theme="dark"] .tb { background: #26282d; }
+:root[data-theme="dark"] .tb:hover:not(:disabled) { background: #303237; border-color: #3a3d43; }
+:root[data-theme="dark"] .searchbox input { background: #1c1e22; color: var(--ink); }
+:root[data-theme="dark"] thead th { background: #191b1e; }
+:root[data-theme="dark"] tbody tr:hover { background: #202226; }
+:root[data-theme="dark"] tbody tr.sel:hover { background: #43301f; }
+:root[data-theme="dark"] tbody tr.sel td { border-bottom-color: #3a2a1e; }
+:root[data-theme="dark"] .t-play { background: #26282d; color: var(--ink); }
+:root[data-theme="dark"] .gallery-head { background: var(--panel); }
+:root[data-theme="dark"] .gh-search, :root[data-theme="dark"] .gh-sort { background: #1c1e22; color: var(--ink); }
+:root[data-theme="dark"] .ctxmenu, :root[data-theme="dark"] .rowmenu, :root[data-theme="dark"] .dev-pop { background: #26282d; color: var(--ink); }
+:root[data-theme="dark"] .drawer, :root[data-theme="dark"] .modal, :root[data-theme="dark"] .celebrate-card { background: var(--panel); }
+:root[data-theme="dark"] .title-edit,
+:root[data-theme="dark"] .desc-edit,
+:root[data-theme="dark"] .t-edit,
+:root[data-theme="dark"] .field input[type=text],
+:root[data-theme="dark"] .field input[type=number],
+:root[data-theme="dark"] .hex-in { background: #1c1e22; color: var(--ink); }
+:root[data-theme="dark"] .pn-size { background: #26282d; color: var(--ink-2); }
+:root[data-theme="dark"] .end-btn { background: #26282d; color: var(--ink-2); }
+:root[data-theme="dark"] .iconpick .ip { background: #26282d; }
+:root[data-theme="dark"] .capacity { background: #191b1e; }
+:root[data-theme="dark"] .cap .bar { background: #303237; }
+:root[data-theme="dark"] .iconup .iu-drop, :root[data-theme="dark"] .ae-wave { background: #1c1e22; }
+:root[data-theme="dark"] .iconup { border-color: var(--line); }
+:root[data-theme="dark"] .ci-badge { background: #0c0d0f; }
+/* the rail is already dark in every theme, so it needs no dark override */

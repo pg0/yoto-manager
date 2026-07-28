@@ -57,7 +57,7 @@ export interface Card {
 }
 
 export type SortKey = 'index' | 'title' | 'duration' | 'size';
-export type DrawerMode = 'rename' | 'icon' | null;
+export type DrawerMode = 'rename' | 'icon' | 'audioedit' | null;
 
 export interface RenameResult {
   uid: string;

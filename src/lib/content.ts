@@ -157,11 +157,37 @@ export async function deleteCardRemote(cardId: string): Promise<void> {
   }
 }
 
+/**
+ * GET /card/{id} and map each chapter key → its signed https trackUrl. The
+ * read-only /card endpoint resolves media refs to signed streaming URLs, whereas
+ * /content returns bare `yoto:#<sha>` refs the browser can't play. Returns an
+ * empty map on any failure - playback just stays disabled, nothing throws.
+ */
+async function fetchSignedTrackUrls(id: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const r = await fetch(`${YOTO}/card/${id}`, { credentials: 'same-origin' });
+    if (!r.ok) return map;
+    const j = (await r.json()) as { card?: RawCardFull };
+    for (const ch of j.card?.content?.chapters ?? []) {
+      const u = ch.tracks?.[0]?.trackUrl;
+      if (u && /^https?:\/\//.test(u)) map.set(ch.key, u);
+    }
+  } catch {
+    /* ignore - no playable URLs */
+  }
+  return map;
+}
+
 export async function fetchCardDetail(cardId: string): Promise<CardDetail> {
   const id = encodeURIComponent(cardId);
   let r = await fetch(`${YOTO}/content/${id}`, { credentials: 'same-origin' });
+  // /content carries the canonical structure + refs; when it's forbidden we fall
+  // back to /card, which already returns signed (playable) URLs directly.
+  let viaContent = r.ok;
   if (r.status === 403) {
     r = await fetch(`${YOTO}/card/${id}`, { credentials: 'same-origin' });
+    viaContent = false;
   }
   if (!r.ok) throw new Error(`GET /content/${cardId} → ${r.status}`);
   const j = (await r.json()) as { card?: RawCardFull };
@@ -169,10 +195,15 @@ export async function fetchCardDetail(cardId: string): Promise<CardDetail> {
   const content = card?.content;
   const chapters = content?.chapters ?? [];
 
+  // /content returns trackUrl as a non-playable yoto:# ref, so pull the signed
+  // streaming URLs from /card and merge them in by chapter key.
+  const signedByKey = viaContent ? await fetchSignedTrackUrls(id) : null;
+
   // MYO cards are one track per chapter; the chapter carries the user-facing
   // title / icon / number, so a chapter maps to one UI row.
   const tracks: Track[] = chapters.map((ch, i) => {
     const tr = ch.tracks?.[0];
+    const rawTrack = tr?.trackUrl && /^https?:\/\//.test(tr.trackUrl) ? tr.trackUrl : undefined;
     return {
       key: ch.key,
       uid: `${cardId}:${ch.key}:${i}`,
@@ -182,7 +213,7 @@ export async function fetchCardDetail(cardId: string): Promise<CardDetail> {
       icon: iconOf(ch.display) ?? iconOf(tr?.display),
       emoji: null,
       overlayLabel: ch.overlayLabel ?? tr?.overlayLabel,
-      trackUrl: tr?.trackUrl && /^https?:\/\//.test(tr.trackUrl) ? tr.trackUrl : undefined,
+      trackUrl: signedByKey?.get(ch.key) ?? rawTrack,
     };
   });
 

@@ -111,6 +111,8 @@ interface State {
   drawer: DrawerMode;
   /** when the icon picker targets one clicked track instead of the selection */
   iconTargetUid: string | null;
+  /** the track being trimmed in the audio editor */
+  audioEditUid: string | null;
   toast: string | null;
   undoStack: string[];
   publishing: boolean;
@@ -158,6 +160,9 @@ interface State {
   signOut: () => Promise<void>;
 
   openCard: (id: string) => void;
+  /** force a fresh detail fetch from Yoto (signed URLs + canonical structure),
+   *  replacing local tracks and clearing dirty - used after a successful publish */
+  reloadCard: (id: string) => Promise<void>;
   setCardFilter: (v: string) => void;
   setTrackFilter: (v: string) => void;
 
@@ -196,6 +201,10 @@ interface State {
 
   openDrawer: (m: DrawerMode) => void;
   openIconPicker: (uid?: string) => void;
+  /** open the audio trim editor for one track */
+  openAudioEditor: (uid: string) => void;
+  /** replace a track's audio after a cut (new yoto:# ref + duration/size), dirty */
+  applyTrackAudio: (uid: string, patch: { trackUrl: string; duration: number; size: number }) => void;
   closeDrawer: () => void;
 
   undo: () => void;
@@ -251,6 +260,7 @@ export const useStore = create<State>((set, get) => ({
   cardFilter: '',
   drawer: null,
   iconTargetUid: null,
+  audioEditUid: null,
   toast: null,
   undoStack: [],
   publishing: false,
@@ -530,6 +540,35 @@ export const useStore = create<State>((set, get) => ({
       undoStack: [],
       loading: false,
     });
+  },
+
+  reloadCard: async (id) => {
+    if (!get().authed) return;
+    try {
+      const d = await fetchCardDetail(id);
+      const durationSec = d.tracks.reduce((a, t) => a + t.duration, 0);
+      const cards = get().cards.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              tracks: d.tracks,
+              cover: d.cover || c.cover,
+              title: d.title || c.title,
+              slug: d.slug || c.slug,
+              durationSec,
+              trackCount: d.tracks.length,
+              settings: { showTrackNumbers: d.showTrackNumbers, loop: d.loop },
+              loaded: true,
+              dirty: false,
+            }
+          : c,
+      );
+      persist(cards);
+      saveCardCache(cards);
+      set({ cards, undoStack: [] });
+    } catch {
+      /* keep current state if the refetch fails */
+    }
   },
 
   openCard: (id) => {
@@ -834,7 +873,21 @@ export const useStore = create<State>((set, get) => ({
 
   openDrawer: (m) => set({ drawer: m, iconTargetUid: null }),
   openIconPicker: (uid) => set({ drawer: 'icon', iconTargetUid: uid ?? null }),
-  closeDrawer: () => set({ drawer: null, iconTargetUid: null }),
+  openAudioEditor: (uid) => set({ drawer: 'audioedit', audioEditUid: uid }),
+  applyTrackAudio: (uid, patch) => {
+    const s = get();
+    const card = s.activeCard();
+    if (!card) return;
+    const undoStack = [...s.undoStack, JSON.stringify(card.tracks)].slice(-50);
+    const tracks = card.tracks.map((t) =>
+      t.uid === uid ? { ...t, trackUrl: patch.trackUrl, duration: patch.duration, size: patch.size } : t,
+    );
+    const cards = s.cards.map((c) => (c.id === card.id ? { ...c, tracks, dirty: true } : c));
+    persist(cards);
+    set({ cards, undoStack, drawer: null, audioEditUid: null });
+    get().showToast('Audio trimmed - publish to save it on Yoto');
+  },
+  closeDrawer: () => set({ drawer: null, iconTargetUid: null, audioEditUid: null }),
 
   undo: () => {
     const s = get();
@@ -898,6 +951,9 @@ export const useStore = create<State>((set, get) => ({
         celebrate: playlistChanges >= 3,
       });
       get().showToast(res.newCardId ? `Created "${card.title}" on Yoto` : `Updated "${card.title}" on Yoto`);
+      // pull server truth back: fresh signed stream URLs + resolved icons, and a
+      // clean dirty/undo state (also makes a just-uploaded track playable).
+      void get().reloadCard(newId);
     } catch (e) {
       set({ publishing: false });
       get().showToast(`Update failed: ${(e as Error).message}`);
@@ -908,12 +964,19 @@ export const useStore = create<State>((set, get) => ({
     const s = get();
     const card = s.activeCard();
     if (!card || !card.dirty) return;
-    // mock: reset just this card from fresh mock; real app refetches from Yoto
+    set({ selected: new Set() });
+    if (s.authed) {
+      // real card: refetch canonical state from Yoto (clears dirty/undo)
+      void s.reloadCard(card.id);
+      get().showToast('Draft discarded, reloaded from Yoto');
+      return;
+    }
+    // mock mode (no OAuth): reset just this card from fresh mock
     const fresh = mockCards().find((c) => c.id === card.id);
     if (!fresh) return;
     const cards = s.cards.map((c) => (c.id === card.id ? fresh : c));
     persist(cards);
-    set({ cards, selected: new Set(), undoStack: [] });
+    set({ cards, undoStack: [] });
     get().showToast('Draft discarded, reloaded from Yoto');
   },
 

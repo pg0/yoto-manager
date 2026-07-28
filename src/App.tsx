@@ -235,7 +235,7 @@ function PaneHead() {
       </label>
       <span className="opt-sep" />
       <button
-        className="btn ghost icon-btn danger"
+        className="x-btn danger"
         onClick={() => setConfirmDel(true)}
         title="Delete this playlist"
         aria-label="Delete this playlist"

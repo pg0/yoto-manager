@@ -1,7 +1,10 @@
 // Audio upload → transcode pipeline (yoto.dev/myo/uploading-to-cards).
 // All API calls go through the backend proxy; the PUT goes straight to the
-// signed storage URL returned in step 1. Field names are read defensively and
-// will be pinned once verified against the docs.
+// signed storage URL returned in step 1. Verified end-to-end against the live
+// API (2026-07): step1 → { upload: { uploadId, uploadUrl } } (uploadUrl null =
+// content already stored, dedup by sha256); cross-origin PUT returns 200 with no
+// CORS block; step3 → { transcode: { transcodedSha256, transcodedInfo: {
+// duration, fileSize, format, channels, ... } } }. Yoto transcodes to opus.
 
 async function sha256Hex(buf: ArrayBuffer): Promise<string> {
   const d = await crypto.subtle.digest('SHA-256', buf);

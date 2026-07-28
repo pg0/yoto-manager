@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    host: true, // bind 0.0.0.0 so a phone on the same LAN can reach it
     proxy: {
       '/api': 'http://127.0.0.1:8788',
       '/auth': 'http://127.0.0.1:8788',

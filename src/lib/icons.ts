@@ -43,7 +43,36 @@ async function proxyIcons(path: string): Promise<YotoIcon[] | null> {
 }
 
 export const fetchPublicIcons = () => proxyIcons('media/displayIcons/user/yoto');
-export const fetchMyIcons = () => proxyIcons('media/displayIcons/user/me');
+
+// Yoto's API has no delete-icon route (verified: DELETE hits a different backend
+// and 403s on auth). So "delete" from My Icons means hiding the mediaId from this
+// manager. We persist the hidden set per browser so it survives reloads/refetches.
+const HIDDEN_KEY = 'yoto-manager:hiddenicons:v1';
+function loadHidden(): Set<string> {
+  try {
+    const raw = localStorage.getItem(HIDDEN_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+export function hideMyIcons(ids: string[]) {
+  const s = loadHidden();
+  for (const id of ids) s.add(id);
+  try {
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify([...s]));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** My uploaded icons, minus any the user has hidden ("deleted") in this browser. */
+export async function fetchMyIcons(): Promise<YotoIcon[] | null> {
+  const list = await proxyIcons('media/displayIcons/user/me');
+  if (!list) return null;
+  const hidden = loadHidden();
+  return list.filter((ic) => !hidden.has(ic.mediaId));
+}
 
 // sha256(bytes) -> yoto:#<mediaId>, so an identical generated icon uploads once.
 const iconRefCache = new Map<string, string>();
