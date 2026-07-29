@@ -22,7 +22,7 @@ Any Yoto owner signs in with their own Yoto account via OAuth and manages only t
 - Bulk icon assignment from the Yoto icon library and custom uploads.
 
 **Non-goals (v1)**
-- **No YouTube-URL download/convert** - out of scope. Server-side downloading YouTube audio on behalf of many users is a ToS and legal exposure a public, GmbH-operated service should not carry. Not planned.
+- **No YouTube-URL download/convert** - out of scope. Server-side downloading YouTube audio on behalf of many users is a ToS and legal exposure a public service should not carry. Not planned.
 - No cross-account features (sharing playlists between users, teams) - each user sees only their own cards.
 - No player/device control (MQTT, remote playback) - out of scope.
 - No podcast/RSS or streaming-track authoring UI (the API supports it; not a v1 feature).
@@ -32,7 +32,7 @@ Any Yoto owner signs in with their own Yoto account via OAuth and manages only t
 
 Any Yoto account owner (parents, mainly). Each user signs in with their own Yoto account through OAuth; the app never sees a Yoto password. A user only ever sees and edits their own MYO cards. There is **no separate app account** - identity is the authenticated Yoto user (their Yoto user id is the primary key). No app-level password, no LAN-trust; access control is the OAuth session.
 
-Operated by Red Coral Studios GmbH, so DSGVO applies: privacy policy, Impressum, a data-deletion path, and honoring Yoto's guideline "don't retain user data beyond what's necessary."
+Operated from Germany, so DSGVO applies: privacy policy, Impressum, a data-deletion path, and honoring Yoto's guideline "don't retain user data beyond what's necessary."
 
 ## 4. Platform constraints (from the Yoto API)
 
@@ -198,7 +198,7 @@ Patrick's refined ask: **primary = show whether a card/its songs are synced (dow
 2. **Single-use refresh token lifecycle, per user.** Crash between refresh and persist = that user forced to re-login; concurrent refreshes for one user = silent lockout. Mitigate: **per-user** refresh mutex + persist-before-use, tokens encrypted at rest, separate dev/prod clients, and a visible "re-auth needed" UI state instead of mystery 401s.
 3. **Shared rate limit + one client for all users.** No published limit, but every user's traffic funnels through one Yoto client - one heavy user could throttle everyone. Mitigate: per-user request budgeting, backoff/retry with jitter, cache the icon library server-side and share it across users, avoid N+1 on the card list. Monitor for 429s.
 4. **Concurrent-edit clobbering.** Refetch + hash-compare right before POST; warn on mismatch. Combined with pre-save snapshots, de-risked.
-5. **Handling other people's data (DSGVO).** Storing per-user tokens + touching children's-content metadata. Mitigate: encrypt tokens at rest, don't persist audio beyond the in-flight upload, minimal retention, clear privacy policy + Impressum + self-serve data deletion (revoke + purge tokens/snapshots), and honor Yoto's "no AI training on content" / "don't retain beyond necessary" rules. Loop in Codie (GmbH/legal) before public launch.
+5. **Handling other people's data (DSGVO).** Storing per-user tokens + touching children's-content metadata. Mitigate: encrypt tokens at rest, don't persist audio beyond the in-flight upload, minimal retention, clear privacy policy + Impressum + self-serve data deletion (revoke + purge tokens/snapshots), and honor Yoto's "no AI training on content" / "don't retain beyond necessary" rules. Get a legal review before public launch.
 
 ## 10. Tech stack summary
 

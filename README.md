@@ -4,6 +4,8 @@ Batch editor for Yoto MYO card playlists. The official Yoto app has no multi-sel
 
 Sign in with your own Yoto account; you only ever see and edit your own cards.
 
+**Use it at https://lda.io/yoto-manager/** - free, nothing to install.
+
 ## What it does
 
 - Multi-select tracks and move them up, down or to the top - or sort by name or number.
