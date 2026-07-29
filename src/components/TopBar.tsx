@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { LOGIN_URL } from '../lib/api';
+import { AUTH_CONFIGURED, signIn } from '../lib/api';
 import { applyTheme, getTheme, nextTheme, type Theme } from '../lib/theme';
 import { DeviceWidget } from './DeviceWidget';
+import { SupportChip } from './SupportChip';
 
 /** Glyph per theme: sun (full white), half-disc (mixed), moon (full dark). */
 function ThemeIcon({ theme }: { theme: Theme }) {
@@ -36,18 +37,6 @@ const THEME_LABEL: Record<Theme, string> = {
   dark: 'Theme: full dark - click for full white',
 };
 
-/** Filled heart glyph for the support link. */
-function Heart() {
-  return (
-    <svg className="heart" width="11" height="11" viewBox="0 0 24 24" aria-label="love" role="img">
-      <path
-        fill="currentColor"
-        d="M12 21s-7.5-4.9-10.2-9.3C.2 8.9 1.5 5.2 4.8 4.4c2-.5 3.9.4 5 2 .3.4.9.4 1.2 0 1.1-1.6 3-2.5 5-2 3.3.8 4.6 4.5 3 7.3C19.5 16.1 12 21 12 21z"
-      />
-    </svg>
-  );
-}
-
 export function TopBar() {
   const authed = useStore((s) => s.authed);
   const displayName = useStore((s) => s.displayName);
@@ -74,15 +63,7 @@ export function TopBar() {
       <button className="theme-btn" onClick={toggleTheme} title={THEME_LABEL[theme]}>
         <ThemeIcon theme={theme} />
       </button>
-      <a
-        className="support-link"
-        href="https://github.com/pg0/yoto-manager"
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Support this project"
-      >
-        <Heart /> support
-      </a>
+      <SupportChip />
       {authed ? (
         <div
           className="who"
@@ -95,9 +76,14 @@ export function TopBar() {
           </button>
         </div>
       ) : (
-        <a className="btn primary sm" href={LOGIN_URL}>
+        <button
+          className="btn primary sm"
+          disabled={!AUTH_CONFIGURED}
+          title={AUTH_CONFIGURED ? 'Sign in with your Yoto account' : 'No Yoto client id in this build (demo mode)'}
+          onClick={() => void signIn()}
+        >
           Sign in with Yoto
-        </a>
+        </button>
       )}
     </div>
   );

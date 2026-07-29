@@ -86,9 +86,10 @@ body {
 .card-cover { width: 34px; height: 34px; border-radius: 3px; object-fit: cover; background: #000; box-shadow: 0 0 0 1px #000; }
 .card-cover.placeholder { display: inline-block; background: linear-gradient(135deg, #2a2c31, #1c1e22); }
 .who-loading { color: #7d818a; font-size: 12px; margin-right: 4px; }
-.support-link { display: inline-flex; align-items: center; gap: 4px; color: #9a9da4; font-size: 12px; text-decoration: none; margin-right: 12px; }
+.support-link { display: inline-flex; align-items: center; gap: 4px; color: #9a9da4; font-size: 12px; text-decoration: none; margin-right: 12px; background: none; border: none; padding: 0; font-family: inherit; cursor: pointer; }
 .support-link:hover { color: #fff; }
 .support-link .heart { color: var(--accent); }
+.support-link.unlocked { color: #d3d6db; }
 .ci-title { font-size: 12.5px; font-weight: 600; color: #d3d6db; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ci-sub { font-size: 11px; color: #7d818a; margin-top: 1px; }
 .ci-badge { font-family: var(--mono); font-size: 11px; color: #9a9da4; background: #000; border: 1px solid var(--rail-line); border-radius: 10px; padding: 1px 7px; }
@@ -195,8 +196,11 @@ th.c-play, td.c-play { width: 40px; text-align: center; padding: 0; }
 .t-play:hover { border-color: var(--accent); color: var(--accent); }
 .t-play.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-/* sticky controls in the icon gallery drawer */
-.gallery-head { position: sticky; top: 0; z-index: 2; background: #fff; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+/* sticky controls in the icon gallery drawer. The drawer body's top padding
+   lives on this header, not the scroll container - padding on the scroller
+   would leave a strip above the sticky header where scrolled icons show. */
+.drawer.gallery .drawer-body { padding-top: 0; }
+.gallery-head { position: sticky; top: 0; z-index: 2; background: #fff; padding-top: 16px; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
 .gallery-tools { display: flex; gap: 8px; margin-top: 8px; }
 .gh-search { flex: 1; font-family: var(--ui); font-size: 12.5px; border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; }
 .gh-sort { font-family: var(--ui); font-size: 12.5px; border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; background: #fff; cursor: pointer; }
@@ -291,6 +295,7 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
 .field input[type=text], .field input[type=number] { width: 100%; font-family: var(--ui); font-size: 13px; border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; background: #fff; }
 .field .row { display: flex; gap: 8px; }
 .field .row > * { flex: 1; }
+.field-error { font-size: 11.5px; color: var(--danger); margin-top: 6px; line-height: 1.4; }
 .tabset { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 /* an action styled to sit in the tab row; it fires numbering, never switches the grid */
 .tabset .numtab { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-weight: 700; }
