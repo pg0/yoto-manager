@@ -6,7 +6,7 @@ Any Yoto owner signs in with their own Yoto account (OAuth) and manages only the
 
 ## Status
 
-M0 in progress. SPA runs on mock data with full local edit logic; OAuth backend is built (Yoto confidential-client flow, token store, authenticated proxy) and boots. Real icons/cover/publish light up once a Yoto dev app is registered (see Setup).
+M0 in progress. **Backend removed in 0.3.0** - the app is now a pure static SPA that runs the OAuth flow in the browser and calls the Yoto API directly. The previous Node/Hono backend (token store + authenticated proxy) is preserved on the `server-backend` branch.
 
 ## Features (planned)
 
@@ -22,30 +22,36 @@ File-manager / explorer paradigm: left rail of cards, right pane a dense sortabl
 
 ## Local-first model
 
-Editing happens against a local draft in `localStorage` (instant, offline, resumable, undo/redo). A **Publish** button pushes the draft to Yoto (whole-object `POST /content`) as an explicit, deliberate step. The backend only owns tokens + proxy + upload + pre-publish snapshots.
+Editing happens against a local draft in `localStorage` (instant, offline, resumable, undo/redo). A **Publish** button pushes the draft to Yoto (whole-object `POST /content`) as an explicit, deliberate step. Nothing leaves the browser except the calls to Yoto itself.
 
 ## Stack
 
-Vite + React + TS SPA, thin Node/Hono backend that owns each user's Yoto tokens (encrypted in Postgres) and proxies the API. One Docker image on odin behind Traefik + HTTPS. Architecture rationale in the PRD.
+Vite + React + TS SPA. **No backend, no database, no server-side state.** The build output is static files that can be dropped on any webspace; the browser runs the OAuth flow and talks to `api.yotoplay.com` directly (every endpoint this app uses answers `Access-Control-Allow-Origin: *`).
 
 ## Setup
 
-1. Register a **public** client (PKCE) at https://dashboard.yoto.dev (separate dev + prod clients). Add `http://127.0.0.1:8788/auth/callback` as an Allowed Callback URL, `http://127.0.0.1:5173` as an Allowed Logout URL, and request scopes `user:content:manage user:icons:manage offline_access`.
-2. `cp .env.example .env`, then set `YOTO_CLIENT_ID` (leave `YOTO_CLIENT_SECRET` blank - public clients have none; the rest have working defaults). Never commit `.env`.
-3. `npm install`, then `npm run dev` - starts the SPA on :5173 and the backend on :8788 together.
-4. Open http://127.0.0.1:5173, then sign in at http://127.0.0.1:8788/auth/login.
+1. Register a **public** client (PKCE) at https://dashboard.yoto.dev. Add every origin you serve the app from as an Allowed Callback URL **with a trailing slash** - `http://127.0.0.1:5173/` for dev, `https://your-domain/` for prod - plus the same values as Allowed Logout URLs (and Allowed Web Origins, if the field exists). Request scopes `user:content:manage user:icons:manage offline_access`.
+2. `cp .env.example .env`, then set `VITE_YOTO_CLIENT_ID`. Everything else has working defaults.
+3. `npm install`, then `npm run dev` → http://127.0.0.1:5173, and hit "Sign in with Yoto".
 
-The backend uses a local encrypted file token store by default (`./.data/tokens.json`). Set `DATABASE_URL` (and `TOKEN_STORE=postgres`) to use Postgres in prod.
+## Deploy
+
+`npm run build` and upload `dist/` to any static webspace. Assets are referenced relatively, so a subfolder deploy works too - the callback URL is derived from wherever `index.html` actually sits. No Node, no Docker, no rewrite rules.
 
 ### OAuth notes
 
-- Default is a **public client with PKCE** (no secret) - the flow the louis editor uses and Yoto's recommended setup. The backend auto-switches to the confidential flow (`client_secret`, no PKCE) only if `YOTO_CLIENT_SECRET` is set.
-- Refresh tokens are single-use and rotate on every refresh - the store swaps in the new one under a per-user in-flight lock so a token is never spent twice.
-- Refresh tokens are encrypted at rest (AES-256-GCM, `TOKEN_ENC_KEY`); the browser only ever holds a signed session cookie, never a Yoto token.
-- The SPA calls the Yoto API only through the backend proxy at `/api/yoto/*`, which injects the bearer token and retries once on a 401 after forcing a refresh.
+- **Public client with PKCE** (no secret). The client id is compiled into the bundle and is public by design - PKCE is what proves possession.
+- Tokens live in this browser's `localStorage` (`src/lib/auth.ts`). Switch the `STORE` constant to `sessionStorage` to trade persistent sign-in for a smaller XSS blast radius.
+- Refresh tokens are single-use and rotate on every refresh; one in-flight refresh at a time so a token is never spent twice.
+- `yotoFetch()` attaches the bearer token and retries once on a 401 after forcing a rotation.
+- Sign-out just clears this browser's storage - there is nothing server-side to delete.
+
+### Known open item
+
+Waveform rendering and the trim editor call `decodeAudioData`, which needs the **signed media URL** to send CORS headers. Plain playback (`<audio>`) works regardless. If that host turns out to be CORS-locked, those two features need a proxy - see the `server-backend` branch, which has one (`/api/media`).
 
 ## Notes
 
-- Content is round-tripped as a whole object - the backend snapshots each card's JSON before every publish (restore path).
-- Operated by a GmbH: DSGVO applies (privacy policy, Impressum, data-deletion path). Tokens encrypted at rest, audio not persisted beyond the in-flight upload.
+- Content is round-tripped as a whole object - publish reads the canonical card first and overlays only the user's edits, so `yoto:#` refs survive verbatim.
+- Operated by a GmbH: an Impressum and privacy policy are still needed (the host sees access logs, and the app hands data to Yoto). But no user content or token is ever processed on our side, so there is nothing to store, encrypt or delete server-side.
 - Yoto API guidelines prohibit training AI on API-provided content and scraping.

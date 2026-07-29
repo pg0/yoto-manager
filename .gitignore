@@ -19,3 +19,6 @@ data/
 snapshots/
 tmp/
 downloads/
+
+# build artifacts
+*.tsbuildinfo

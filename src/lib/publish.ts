@@ -1,8 +1,7 @@
 import type { Card } from '../types';
 import { fetchCanonicalCard } from './content';
 import { uploadDisplayIcon } from './icons';
-
-const YOTO = '/api/yoto';
+import { yotoFetch } from './auth';
 
 export interface PublishResult {
   ok: boolean;
@@ -124,9 +123,8 @@ export async function updatePlaylist(card: Card): Promise<PublishResult> {
     content: { ...raw?.content, config, chapters },
   };
 
-  const res = await fetch(`${YOTO}/content`, {
+  const res = await yotoFetch('content', {
     method: 'POST',
-    credentials: 'same-origin',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
   });

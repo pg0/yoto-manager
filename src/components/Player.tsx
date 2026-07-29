@@ -3,8 +3,10 @@ import { useStore } from '../store';
 import { fmtDur } from '../lib/format';
 import { fetchDevices, type YotoDevice } from '../lib/devices';
 
-/** Same-origin proxy URL so the browser can fetch + decode the audio. */
-const mediaUrl = (u: string) => `/api/media?url=${encodeURIComponent(u)}`;
+/** Yoto's signed media URLs are used directly: <audio> plays them cross-origin
+ *  without CORS, and the waveform decode below degrades to "no waveform" if the
+ *  media host doesn't send CORS headers. */
+const mediaUrl = (u: string) => u;
 
 /** Loudspeaker glyph for the output-device button. */
 function SpeakerIcon() {
@@ -131,7 +133,7 @@ export function Player() {
     if (!streamable) return;
     (async () => {
       try {
-        const res = await fetch(mediaUrl(streamable), { credentials: 'same-origin' });
+        const res = await fetch(mediaUrl(streamable));
         const buf = await res.arrayBuffer();
         const ctx = new AudioContext();
         const decoded = await ctx.decodeAudioData(buf);

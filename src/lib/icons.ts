@@ -1,4 +1,5 @@
 import { ICON_EMOJI, pixIcon } from '../data/mock';
+import { yotoFetch } from './auth';
 
 /** Yoto's default MYO track icon, shown when a track has no custom icon set. */
 export const DEFAULT_TRACK_ICON =
@@ -12,13 +13,13 @@ export interface YotoIcon {
 }
 
 /**
- * Real Yoto icon endpoints require an authenticated call through the backend
- * proxy (`/api/yoto/*`). The public library returns 401 without a token, so in
- * M0 (no backend/OAuth yet) these resolve to [] and the UI falls back to mock.
+ * Real Yoto icon endpoints need an authenticated call. Signed out (or with a
+ * token that lacks the icon scope) these resolve to null and the UI falls back
+ * to the mock library.
  */
 async function proxyIcons(path: string): Promise<YotoIcon[] | null> {
   try {
-    const r = await fetch(`/api/yoto/${path}`);
+    const r = await yotoFetch(path);
     if (!r.ok) return null;
     const data = await r.json();
     const mapped: YotoIcon[] = (data.displayIcons ?? []).map(
@@ -110,9 +111,8 @@ export async function uploadDisplayIcon(dataUrl: string): Promise<string> {
   const cached = iconRefCache.get(sha);
   if (cached) return cached;
   const params = new URLSearchParams({ autoConvert: 'true', filename: `icon-${sha.slice(0, 8)}.png` });
-  const r = await fetch(`/api/yoto/media/displayIcons/user/me/upload?${params.toString()}`, {
+  const r = await yotoFetch(`media/displayIcons/user/me/upload?${params.toString()}`, {
     method: 'POST',
-    credentials: 'same-origin',
     headers: { 'content-type': 'image/png' },
     body: buf,
   });

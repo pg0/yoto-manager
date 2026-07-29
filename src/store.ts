@@ -406,12 +406,12 @@ export const useStore = create<State>((set, get) => ({
 
   init: async () => {
     // paint the cached real cards instantly (if we have them) so there's no
-    // empty→demo→real flash while /api/me and /content/mine resolve
+    // empty→demo→real flash while /content/mine resolves
     const cached = loadCardCache();
     if (cached.length) set({ cards: cached, activeId: cached[0].id, loading: true });
     else set({ loading: true });
 
-    const me = await fetchMe();
+    const me = fetchMe();
     if (!me.authenticated) {
       // signed out → demo mode (local draft or mock sample)
       const demo = loadCards();
@@ -523,7 +523,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   signOut: async () => {
-    await apiLogout();
+    apiLogout();
     try {
       localStorage.removeItem(CARDS_KEY);
     } catch {

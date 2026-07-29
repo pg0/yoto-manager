@@ -1,17 +1,15 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// In dev the SPA runs on :5173 and proxies /api and /auth to the Node backend
-// on :8787 (see server/). The app still works offline on mock data until you
-// sign in via /auth/login.
+// Static SPA, no backend. The app talks to api.yotoplay.com directly (CORS is
+// open on every endpoint it uses), so there is nothing to proxy in dev either -
+// dev and prod behave identically.
 export default defineConfig({
   plugins: [react()],
+  // relative asset URLs so the build also works from a subfolder on plain webspace
+  base: './',
   server: {
     port: 5173,
     host: true, // bind 0.0.0.0 so a phone on the same LAN can reach it
-    proxy: {
-      '/api': 'http://127.0.0.1:8788',
-      '/auth': 'http://127.0.0.1:8788',
-    },
   },
 });

@@ -1,3 +1,5 @@
+import { AUTH_CONFIGURED, currentSession, clearSession, login } from './auth';
+
 export interface MeResponse {
   authenticated: boolean;
   displayName?: string | null;
@@ -5,20 +7,18 @@ export interface MeResponse {
   userId?: string | null;
 }
 
-/** Backend session state. Works in dev via the Vite proxy, same-origin in prod. */
-export async function fetchMe(): Promise<MeResponse> {
-  try {
-    const r = await fetch('/api/me', { credentials: 'same-origin' });
-    if (!r.ok) return { authenticated: false };
-    return (await r.json()) as MeResponse;
-  } catch {
-    // backend not running (pure-frontend dev) - stay in local/mock mode
-    return { authenticated: false };
-  }
+/** Session state, read straight from this browser's stored tokens. */
+export function fetchMe(): MeResponse {
+  if (!AUTH_CONFIGURED) return { authenticated: false };
+  return currentSession();
 }
 
-export const LOGIN_URL = '/auth/login';
+/** Start the Yoto sign-in redirect. */
+export const signIn = login;
 
-export async function logout(): Promise<void> {
-  await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
+export { AUTH_CONFIGURED };
+
+/** Sign out = forget the tokens held in this browser. Nothing server-side. */
+export function logout(): void {
+  clearSession();
 }

@@ -1,34 +1,23 @@
 {
   "name": "yoto-manager",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n web,api -c cyan,magenta \"vite\" \"npm:server\"",
-    "dev:web": "vite",
-    "server": "tsx watch server/index.ts",
-    "start": "NODE_ENV=production tsx server/index.ts",
-    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json && vite build",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.11",
-    "dotenv": "^17.4.2",
-    "hono": "^4.12.32",
-    "pg": "^8.22.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
-    "@types/pg": "^8.20.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "concurrently": "^10.0.3",
-    "tsx": "^4.23.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.11"
   }

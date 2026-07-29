@@ -1,15 +1,14 @@
 // Browser-side audio trimming, zero dependencies. We decode the track's audio
-// with the WebAudio API (same media proxy the player uses), slice the buffer to
-// a [start, end] window, and encode it back to a WAV File. Yoto's upload pipeline
-// transcodes whatever we send to opus, so WAV in is fine - it just keeps us free
-// of any mp3/ffmpeg dependency (ffmpeg-wasm alone is a 65 MB blob).
+// with the WebAudio API, slice the buffer to a [start, end] window, and encode
+// it back to a WAV File. Yoto's upload pipeline transcodes whatever we send to
+// opus, so WAV in is fine - it just keeps us free of any mp3/ffmpeg dependency
+// (ffmpeg-wasm alone is a 65 MB blob).
 
-/** Same-origin proxy so the browser can fetch + decode the signed media URL. */
-const mediaUrl = (u: string) => `/api/media?url=${encodeURIComponent(u)}`;
-
-/** Fetch + decode a streamable (https) track URL into an AudioBuffer. */
+/** Fetch + decode a streamable (https) track URL into an AudioBuffer.
+ *  decodeAudioData needs the raw bytes, so the signed media host has to answer
+ *  with CORS headers - unlike <audio> playback, which works without them. */
 export async function decodeTrackAudio(streamUrl: string): Promise<AudioBuffer> {
-  const res = await fetch(mediaUrl(streamUrl), { credentials: 'same-origin' });
+  const res = await fetch(streamUrl);
   if (!res.ok) throw new Error(`fetch audio ${res.status}`);
   const buf = await res.arrayBuffer();
   const ctx = new AudioContext();

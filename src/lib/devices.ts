@@ -1,5 +1,7 @@
 // Yoto player devices (the physical boxes). Read-only listing for the output
 // picker; actual casting needs the MQTT device-control channel (separate work).
+import { yotoFetch } from './auth';
+
 export interface YotoDevice {
   deviceId: string;
   name: string;
@@ -42,9 +44,7 @@ export interface DeviceStatus {
  */
 export async function fetchDeviceStatus(deviceId: string): Promise<DeviceStatus | null> {
   try {
-    const r = await fetch(`/api/yoto/device-v2/${encodeURIComponent(deviceId)}/config`, {
-      credentials: 'same-origin',
-    });
+    const r = await yotoFetch(`device-v2/${encodeURIComponent(deviceId)}/config`);
     if (!r.ok) return null;
     const j = (await r.json()) as { device?: Record<string, unknown> };
     const d = j.device;
@@ -86,7 +86,7 @@ export async function fetchDeviceStatuses(): Promise<DeviceStatus[]> {
  */
 export async function fetchDevices(): Promise<YotoDevice[]> {
   try {
-    const r = await fetch('/api/yoto/device-v2/devices/mine', { credentials: 'same-origin' });
+    const r = await yotoFetch('device-v2/devices/mine');
     if (!r.ok) return [];
     const j = (await r.json()) as { devices?: RawDevice[] } | RawDevice[];
     const arr: RawDevice[] = Array.isArray(j) ? j : j.devices ?? [];

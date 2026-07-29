@@ -1,10 +1,10 @@
 import { DEFAULT_SETTINGS, type Card, type Track } from '../types';
+import { yotoFetch } from './auth';
 
 // Read path against the documented Yoto content API (yoto.dev/api/content,
 // yoto.dev/reference/card-content-schema, yoto.dev/myo/how-playlists-work).
-// All calls go through the backend proxy at /api/yoto/* which injects the
-// bearer token; the browser never holds a Yoto token.
-const YOTO = '/api/yoto';
+// Calls go straight to api.yotoplay.com; yotoFetch attaches this browser's
+// bearer token and refreshes it when needed.
 
 // --- documented raw shapes (only the fields we read) ---
 interface RawDisplay {
@@ -85,7 +85,7 @@ function iconOf(d?: RawDisplay): string | null {
  * (no chapters); we build shells and lazy-load each card's tracks on open.
  */
 export async function fetchCardList(): Promise<Card[]> {
-  const r = await fetch(`${YOTO}/content/mine`, { credentials: 'same-origin' });
+  const r = await yotoFetch('content/mine');
   if (!r.ok) throw new Error(`GET /content/mine → ${r.status}`);
   const j = (await r.json()) as { cards?: RawCardListItem[] };
   return (j.cards ?? []).map(toShell);
@@ -131,7 +131,7 @@ export interface CardDetail {
  */
 export async function fetchCanonicalCard(cardId: string): Promise<RawCardFull | null> {
   const id = encodeURIComponent(cardId);
-  const r = await fetch(`${YOTO}/content/${id}`, { credentials: 'same-origin' });
+  const r = await yotoFetch(`content/${id}`);
   if (!r.ok) return null;
   const j = (await r.json()) as { card?: RawCardFull };
   return j.card ?? null;
@@ -144,7 +144,7 @@ export async function fetchCanonicalCard(cardId: string): Promise<RawCardFull | 
  */
 export async function deleteCardRemote(cardId: string): Promise<void> {
   const id = encodeURIComponent(cardId);
-  const r = await fetch(`${YOTO}/content/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+  const r = await yotoFetch(`content/${id}`, { method: 'DELETE' });
   if (!r.ok) {
     let msg = `${r.status}`;
     try {
@@ -166,7 +166,7 @@ export async function deleteCardRemote(cardId: string): Promise<void> {
 async function fetchSignedTrackUrls(id: string): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   try {
-    const r = await fetch(`${YOTO}/card/${id}`, { credentials: 'same-origin' });
+    const r = await yotoFetch(`card/${id}`);
     if (!r.ok) return map;
     const j = (await r.json()) as { card?: RawCardFull };
     for (const ch of j.card?.content?.chapters ?? []) {
@@ -181,12 +181,12 @@ async function fetchSignedTrackUrls(id: string): Promise<Map<string, string>> {
 
 export async function fetchCardDetail(cardId: string): Promise<CardDetail> {
   const id = encodeURIComponent(cardId);
-  let r = await fetch(`${YOTO}/content/${id}`, { credentials: 'same-origin' });
+  let r = await yotoFetch(`content/${id}`);
   // /content carries the canonical structure + refs; when it's forbidden we fall
   // back to /card, which already returns signed (playable) URLs directly.
   let viaContent = r.ok;
   if (r.status === 403) {
-    r = await fetch(`${YOTO}/card/${id}`, { credentials: 'same-origin' });
+    r = await yotoFetch(`card/${id}`);
     viaContent = false;
   }
   if (!r.ok) throw new Error(`GET /content/${cardId} → ${r.status}`);

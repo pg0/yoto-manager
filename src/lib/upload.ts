@@ -1,10 +1,12 @@
 // Audio upload → transcode pipeline (yoto.dev/myo/uploading-to-cards).
-// All API calls go through the backend proxy; the PUT goes straight to the
+// All API calls are made straight from the browser; the PUT goes to the
 // signed storage URL returned in step 1. Verified end-to-end against the live
 // API (2026-07): step1 → { upload: { uploadId, uploadUrl } } (uploadUrl null =
 // content already stored, dedup by sha256); cross-origin PUT returns 200 with no
 // CORS block; step3 → { transcode: { transcodedSha256, transcodedInfo: {
 // duration, fileSize, format, channels, ... } } }. Yoto transcodes to opus.
+
+import { yotoFetch } from './auth';
 
 async function sha256Hex(buf: ArrayBuffer): Promise<string> {
   const d = await crypto.subtle.digest('SHA-256', buf);
@@ -29,9 +31,7 @@ export async function uploadAudioFile(file: File, onPct: Pct): Promise<UploadedT
 
   // 1. ask for a signed upload URL keyed by the file's sha256
   const q = `sha256=${sha}&filename=${encodeURIComponent(file.name)}`;
-  const u = await fetch(`/api/yoto/media/transcode/audio/uploadUrl?${q}`, {
-    credentials: 'same-origin',
-  });
+  const u = await yotoFetch(`media/transcode/audio/uploadUrl?${q}`);
   if (!u.ok) throw new Error(`uploadUrl ${u.status}`);
   const uj = await u.json();
   const info = uj.upload ?? {};
@@ -52,9 +52,8 @@ export async function uploadAudioFile(file: File, onPct: Pct): Promise<UploadedT
 
   // 3. poll until the transcode is ready (completion signal: transcode.transcodedSha256)
   for (let i = 0; i < 60; i++) {
-    const t = await fetch(
-      `/api/yoto/media/upload/${encodeURIComponent(uploadId)}/transcoded?loudnorm=false`,
-      { credentials: 'same-origin' },
+    const t = await yotoFetch(
+      `media/upload/${encodeURIComponent(uploadId)}/transcoded?loudnorm=false`,
     );
     if (t.ok) {
       const tj = await t.json();
