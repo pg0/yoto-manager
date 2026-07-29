@@ -2,7 +2,7 @@
 
 - Status: Draft v0.2
 - Date: 2026-07-24
-- Owner: Patrick Gawron / Red Coral Studios GmbH
+- Owner: Patrick Gawron
 - Model: public multi-user, local-first (localStorage draft to publish), file-manager UI
 - Location: `C:\code\vibes\yoto-manager`
 - Companion tool: `C:\code\vibes\yoto-icon` (image to 16x16 Yoto icon)
