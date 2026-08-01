@@ -226,6 +226,9 @@ th.c-play, td.c-play { width: 40px; text-align: center; padding: 0; }
 .pl-outwrap { position: relative; flex: none; }
 .pl-outbtn { background: #1c1e22; color: #d3d6db; border: 1px solid #33363c; border-radius: 4px; font-size: 12px; padding: 5px 8px; cursor: pointer; }
 .pl-outbtn:hover { color: #fff; border-color: #4a4d53; }
+/* a physical box is the output: the button carries the accent so the bar reads
+   as "this is coming out of the Yoto, not the browser" at a glance */
+.pl-outbtn.on { color: var(--accent); border-color: var(--accent); }
 .pl-outmenu { position: absolute; bottom: calc(100% + 8px); right: 0; min-width: 220px; background: #14161a; border: 1px solid #33363c; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.4); padding: 6px; z-index: 80; }
 .om-sec { color: #7d818a; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; padding: 8px 8px 4px; }
 .om-item { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: #d3d6db; font-size: 12.5px; padding: 7px 8px; border-radius: 5px; cursor: pointer; }
@@ -496,6 +499,105 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
 .dev-rows dd.ok { color: var(--ok); font-weight: 700; }
 .dev-rows dd.muted { color: var(--ink-3); }
 .dev-note { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line-2); font-size: 11px; color: var(--ink-3); }
+.dev-playing { max-width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ok); font-weight: 600; }
+
+/* now playing + transport for the box, inside the popover */
+.box-now { border-bottom: 1px solid var(--line-2); padding-bottom: 10px; margin-bottom: 10px; }
+.bn-state { font-size: 12px; color: var(--ink-3); padding: 4px 0; }
+.bn-track { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bn-sub { font-size: 11.5px; color: var(--ink-3); min-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bn-bar { height: 4px; border-radius: 2px; background: var(--line-2); margin: 7px 0 3px; overflow: hidden; }
+.bn-bar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+.bn-time { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.bn-transport { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 9px; }
+.bn-volrow { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+.bn-btn { width: 28px; height: 28px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 6px; font-size: 11px; cursor: pointer; }
+.bn-btn:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.bn-btn:disabled { opacity: .4; cursor: default; }
+.bn-btn.play { font-size: 12px; }
+.bn-vol { font-size: 12px; }
+.bn-volrange { flex: 1; min-width: 0; accent-color: var(--accent); }
+.bn-volpct { font-size: 10.5px; color: var(--ink-3); width: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+.bn-sleep { margin-top: 8px; width: 100%; font-size: 11.5px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink-2); }
+.bn-track.link, .bn-sub.link { cursor: pointer; }
+.bn-track.link:hover, .bn-sub.link:hover { color: var(--accent); }
+.bn-reject { margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--danger); }
+.dev-bat.stale { opacity: .6; }
+.dev-stale { font-size: 10px; color: var(--ink-3); font-weight: 600; }
+
+/* ============================================================
+   Bottom bar mirroring a physical player (BoxBar)
+   ============================================================ */
+.player.boxbar { gap: 10px; }
+.bb-badge { display: inline-flex; align-items: center; gap: 7px; color: var(--accent); min-width: 0; }
+.bb-name { color: #e9e9ea; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bb-stop { width: 28px; height: 28px; flex: none; border-radius: 6px; border: 1px solid #33363c; background: #1c1e22; color: #d3d6db; font-size: 10px; cursor: pointer; display: grid; place-items: center; }
+.bb-stop:hover:not(:disabled) { color: #fff; border-color: #4a4d53; }
+.bb-stop:disabled { opacity: .4; cursor: default; }
+.bb-track { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.bb-title { color: #e9e9ea; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bb-title.link { cursor: pointer; }
+.bb-title.link:hover { color: #fff; text-decoration: underline; }
+.bb-bar { height: 4px; border-radius: 2px; background: #33363c; overflow: hidden; }
+.bb-bar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+.bb-state { font-size: 11px; color: #9a9da4; white-space: nowrap; flex: none; }
+.bb-state.warn { color: #ffb3ad; }
+
+/* ============================================================
+   Mobile: the rail becomes an overlay drawer, everything else reflows.
+   Above this width the layout is untouched.
+   ============================================================ */
+.rail-toggle { display: none; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none; margin-left: -4px; border: 0; border-radius: 6px; background: transparent; color: #cfd2d7; cursor: pointer; }
+.rail-toggle:hover { background: rgba(255,255,255,.1); color: #fff; }
+.rail-back { display: none; }
+
+@media (max-width: 860px) {
+  .rail-toggle { display: inline-flex; }
+  .app { grid-template-columns: 1fr; }
+  .topbar { grid-column: 1 / -1; gap: 8px; padding: 0 8px; }
+  .brand span { display: none; }
+  /* font-size:0 collapses the "Signed in" label; the button opts back in */
+  .topbar .who { gap: 6px; font-size: 0; }
+  .topbar .who .btn.ghost { font-size: 12px; }
+  .dev-name { max-width: 70px; }
+  .dev-playing { display: none; }
+
+  .rail {
+    position: fixed; top: 44px; left: 0; bottom: 0; z-index: 90;
+    width: min(84vw, 300px);
+    transform: translateX(-100%); transition: transform .2s ease;
+    box-shadow: 0 0 40px rgba(0,0,0,.5);
+  }
+  .rail.open { transform: none; }
+  .rail-back { display: block; position: fixed; inset: 44px 0 0 0; z-index: 89; background: rgba(0,0,0,.45); }
+
+  .pane-head { flex-wrap: wrap; gap: 10px; padding: 10px 12px; }
+  .pane-title { flex: 1 1 160px; }
+  .pane-title .title-edit { min-width: 0; width: 100%; }
+  .pane-head .spacer { display: none; }
+  .pane-head .opt-sep { display: none; }
+
+  /* the toolbar keeps every button, it just scrolls sideways */
+  .toolbar { overflow-x: auto; flex-wrap: nowrap; padding: 8px 10px; scrollbar-width: thin; }
+  .toolbar .spacer { flex: 0 0 8px; }
+
+  /* narrow screens drop the two numeric columns; title and controls stay */
+  th.c-dur, td.c-dur, th.c-size, td.c-size { display: none; }
+  th.c-num, td.c-num { width: 30px; }
+  th.c-check, td.c-check { padding-left: 8px; }
+  tbody td { height: 44px; }
+
+  .capacity { flex-wrap: wrap; gap: 10px 16px; padding: 8px 12px; }
+  .capacity .warnmsg { margin-left: 0; flex-basis: 100%; }
+
+  .player { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .pl-meta { width: auto; flex: 1 1 100%; padding-left: 0; }
+  .pl-wave { flex-basis: 100%; height: 28px; order: 10; }
+  .pl-volrange { width: 60px; }
+  .bb-track { flex-basis: 100%; order: 10; }
+
+  .dev-pop { position: fixed; top: 48px; left: 8px; right: 8px; min-width: 0; }
+}
 
 /* ============================================================
    Custom icon upload (own image → 16x16) in the icon drawer
@@ -566,6 +668,8 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
 :root[data-theme="dark"] .gallery-head { background: var(--panel); }
 :root[data-theme="dark"] .gh-search, :root[data-theme="dark"] .gh-sort { background: #1c1e22; color: var(--ink); }
 :root[data-theme="dark"] .ctxmenu, :root[data-theme="dark"] .rowmenu, :root[data-theme="dark"] .dev-pop { background: #26282d; color: var(--ink); }
+:root[data-theme="dark"] .bn-btn, :root[data-theme="dark"] .bn-sleep { background: #1c1e22; color: var(--ink); }
+:root[data-theme="dark"] .bn-bar { background: #303237; }
 :root[data-theme="dark"] .drawer, :root[data-theme="dark"] .modal, :root[data-theme="dark"] .celebrate-card { background: var(--panel); }
 :root[data-theme="dark"] .title-edit,
 :root[data-theme="dark"] .desc-edit,

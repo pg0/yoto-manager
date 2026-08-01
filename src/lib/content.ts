@@ -36,7 +36,11 @@ interface RawChapter {
 }
 interface RawContent {
   chapters?: RawChapter[];
-  config?: { autoadvance?: 'next' | 'repeat' | 'none' } & Record<string, unknown>;
+  config?: {
+    autoadvance?: 'next' | 'repeat' | 'none';
+    /** chapter ranges to shuffle; present and non-empty means shuffle is on */
+    shuffle?: { start: number; end: number; limit: number }[];
+  } & Record<string, unknown>;
   [k: string]: unknown;
 }
 interface RawCardMeta {
@@ -115,6 +119,7 @@ export interface CardDetail {
   slug: string;
   loop: boolean;
   showTrackNumbers: boolean;
+  shuffle: boolean;
 }
 
 /**
@@ -224,5 +229,6 @@ export async function fetchCardDetail(cardId: string): Promise<CardDetail> {
     slug: card?.slug || '',
     loop: content?.config?.autoadvance === 'repeat',
     showTrackNumbers: chapters.some((ch) => !!ch.overlayLabel),
+    shuffle: (content?.config?.shuffle?.length ?? 0) > 0,
   };
 }

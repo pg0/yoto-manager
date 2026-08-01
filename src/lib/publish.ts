@@ -113,7 +113,18 @@ export async function updatePlaylist(card: Card): Promise<PublishResult> {
 
   // Clean payload matching the shape Yoto accepts: no createdAt/updatedAt/deleted.
   // Loop maps to content.config.autoadvance ('repeat' = loop, 'next' = continue).
-  const config = { ...raw?.content?.config, autoadvance: card.settings.loop ? 'repeat' : 'next' };
+  // Shuffle is a list of chapter ranges; "shuffle the whole card" is one range
+  // covering every chapter, keeping all of them. Recomputed on every publish so
+  // it still spans the card after tracks are added or removed. Off = empty list.
+  const shuffle =
+    card.settings.shuffle && chapters.length > 0
+      ? [{ start: 0, end: chapters.length - 1, limit: chapters.length }]
+      : [];
+  const config = {
+    ...raw?.content?.config,
+    autoadvance: card.settings.loop ? 'repeat' : 'next',
+    shuffle,
+  };
   const payload: Record<string, unknown> = {
     // omit cardId when creating - Yoto assigns one and returns it
     ...(creating ? {} : { cardId: raw!.cardId }),

@@ -233,6 +233,17 @@ function PaneHead() {
         />
         Loop
       </label>
+      <label
+        className="opt"
+        title="Play the tracks in a random order on the Yoto player (the Yoto app ignores this)"
+      >
+        <input
+          type="checkbox"
+          checked={card.settings.shuffle}
+          onChange={(e) => setSetting('shuffle', e.target.checked)}
+        />
+        Shuffle
+      </label>
       <span className="opt-sep" />
       <button
         className="x-btn danger"
@@ -286,6 +297,8 @@ export default function App() {
   const closeDrawer = useStore((s) => s.closeDrawer);
   const toast = useStore((s) => s.toast);
   const init = useStore((s) => s.init);
+  const railOpen = useStore((s) => s.railOpen);
+  const setRailOpen = useStore((s) => s.setRailOpen);
 
   useEffect(() => {
     void init();
@@ -304,6 +317,7 @@ export default function App() {
         move('down');
       } else if (e.key === 'Escape') {
         closeDrawer();
+        useStore.getState().setRailOpen(false);
       } else if (e.code === 'Space') {
         const el = e.target as HTMLElement | null;
         if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
@@ -338,6 +352,8 @@ export default function App() {
         <div className="app">
           <TopBar />
           <CardRail />
+          {/* mobile only: tapping beside the rail drawer closes it */}
+          {railOpen && <div className="rail-back" onClick={() => setRailOpen(false)} />}
           <main className="main">
             <PaneHead />
             <Toolbar />

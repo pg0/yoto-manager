@@ -42,6 +42,8 @@ export function TopBar() {
   const displayName = useStore((s) => s.displayName);
   const loading = useStore((s) => s.loading);
   const signOut = useStore((s) => s.signOut);
+  const railOpen = useStore((s) => s.railOpen);
+  const setRailOpen = useStore((s) => s.setRailOpen);
   const [theme, setTheme] = useState<Theme>(getTheme);
 
   function toggleTheme() {
@@ -52,6 +54,22 @@ export function TopBar() {
 
   return (
     <div className="topbar">
+      <button
+        className="rail-toggle"
+        onClick={() => setRailOpen(!railOpen)}
+        title={railOpen ? 'Hide the card list' : 'Show the card list'}
+        aria-label="Toggle the card list"
+        aria-expanded={railOpen}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden>
+          <path
+            d={railOpen ? 'M6 6l12 12M18 6L6 18' : 'M4 7h16M4 12h16M4 17h16'}
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
       <div className="brand">
         <span className="dot" />
         <b>yoto</b>

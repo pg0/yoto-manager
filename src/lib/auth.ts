@@ -18,7 +18,9 @@ const AUDIENCE = env.VITE_YOTO_AUDIENCE ?? 'https://api.yotoplay.com';
 const CLIENT_ID = env.VITE_YOTO_CLIENT_ID ?? '';
 const SCOPES =
   env.VITE_YOTO_SCOPES ??
-  'openid profile user:content:view user:content:manage user:icons:manage family:devices:view offline_access';
+  // family:devices:control is what the MQTT player channel authorises against -
+  // without it the box connection is refused, everything else still works
+  'openid profile user:content:view user:content:manage user:icons:manage family:devices:view family:devices:control offline_access';
 
 /** Registered as an Allowed Callback URL in the Yoto dashboard. The directory
  *  the app is served from is used (not a /callback route) so plain static

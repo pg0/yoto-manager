@@ -14,6 +14,14 @@ export function CardRail() {
   const authed = useStore((s) => s.authed);
   const myUserId = useStore((s) => s.myUserId);
   const displayName = useStore((s) => s.displayName);
+  const railOpen = useStore((s) => s.railOpen);
+  const setRailOpen = useStore((s) => s.setRailOpen);
+
+  /** On mobile the rail is an overlay, so picking a card has to close it. */
+  function pickCard(id: string) {
+    openCard(id);
+    setRailOpen(false);
+  }
 
   const q = cardFilter.toLowerCase();
   const list = cards.filter((c) => c.title.toLowerCase().includes(q));
@@ -38,7 +46,7 @@ export function CardRail() {
       <div
         key={c.id}
         className={`card-item${c.id === activeId ? ' active' : ''}${c.dirty ? ' dirty' : ''}`}
-        onClick={() => openCard(c.id)}
+        onClick={() => pickCard(c.id)}
       >
         {c.cover ? (
           <img className="card-cover" src={c.cover} alt="" />
@@ -55,13 +63,20 @@ export function CardRail() {
   }
 
   return (
-    <aside className="rail">
+    <aside className={`rail${railOpen ? ' open' : ''}`}>
       <div className="rail-head">
         <span>My cards</span>
         <div className="rh-right">
           <span className="count">{cards.length}</span>
           {authed && (
-            <button className="rh-new" onClick={newCard} title="New playlist">
+            <button
+              className="rh-new"
+              onClick={() => {
+                newCard();
+                setRailOpen(false);
+              }}
+              title="New playlist"
+            >
               + New
             </button>
           )}

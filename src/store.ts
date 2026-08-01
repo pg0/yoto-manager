@@ -131,6 +131,14 @@ interface State {
   // in-app audio preview
   playingUid: string | null;
   playTrack: (uid: string | null) => void;
+  /** where the bottom player sends audio: this browser (null) or a physical box.
+   *  The bar itself is unchanged either way - only the output differs, the way a
+   *  different speaker would. */
+  outputBox: { deviceId: string; name: string } | null;
+  setOutputBox: (box: { deviceId: string; name: string } | null) => void;
+  /** left rail as an overlay drawer - only has an effect at mobile widths */
+  railOpen: boolean;
+  setRailOpen: (open: boolean) => void;
   /** advance to the next playable track in the visible list (auto-play on end) */
   playNext: () => void;
   /** nonce the Player watches to toggle play/pause (spacebar) */
@@ -274,6 +282,10 @@ export const useStore = create<State>((set, get) => ({
 
   playingUid: null,
   playTrack: (uid) => set({ playingUid: uid }),
+  outputBox: null,
+  setOutputBox: (outputBox) => set({ outputBox }),
+  railOpen: false,
+  setRailOpen: (railOpen) => set({ railOpen }),
   playNext: () => {
     const s = get();
     const streamable = (t: Track) => !!t.trackUrl && /^https?:\/\//.test(t.trackUrl);
@@ -508,7 +520,7 @@ export const useStore = create<State>((set, get) => ({
               slug: c.slug || d.slug,
               durationSec,
               trackCount: d.tracks.length,
-              settings: { showTrackNumbers: d.showTrackNumbers, loop: d.loop },
+              settings: { showTrackNumbers: d.showTrackNumbers, loop: d.loop, shuffle: d.shuffle },
               loaded: true,
             }
           : c,
@@ -557,7 +569,7 @@ export const useStore = create<State>((set, get) => ({
               slug: d.slug || c.slug,
               durationSec,
               trackCount: d.tracks.length,
-              settings: { showTrackNumbers: d.showTrackNumbers, loop: d.loop },
+              settings: { showTrackNumbers: d.showTrackNumbers, loop: d.loop, shuffle: d.shuffle },
               loaded: true,
               dirty: false,
             }

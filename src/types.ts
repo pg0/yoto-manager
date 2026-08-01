@@ -29,9 +29,13 @@ export interface CardSettings {
   showTrackNumbers: boolean;
   /** repeat the card from the top when the last track ends */
   loop: boolean;
+  /** play the tracks in a random order. Yoto shuffles chapters, and a MYO card
+   *  is one track per chapter, so this shuffles tracks. Players only - the Yoto
+   *  app ignores it. */
+  shuffle: boolean;
 }
 
-export const DEFAULT_SETTINGS: CardSettings = { showTrackNumbers: true, loop: false };
+export const DEFAULT_SETTINGS: CardSettings = { showTrackNumbers: true, loop: false, shuffle: false };
 
 export interface Card {
   id: string;

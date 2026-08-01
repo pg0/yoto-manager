@@ -12,6 +12,7 @@ Sign in with your own Yoto account; you only ever see and edit your own cards.
 - Bulk rename with live preview: auto-numbering and find & replace (regex works).
 - Assign icons in bulk, from the Yoto icon library or your own uploads.
 - Upload MP3s straight onto a card.
+- See what your Yoto player is playing right now, and control it: play/pause, stop, volume, sleep timer, and send a playlist to the box.
 
 ## Local-first
 
@@ -21,7 +22,7 @@ All editing happens in a local draft in your browser - instant, offline-capable,
 
 Static SPA (Vite + React + TypeScript). The build output runs on any static webspace, subfolder included - no Node, no Docker, no rewrite rules.
 
-1. Register a **public** client (PKCE) at https://dashboard.yoto.dev. Add every origin you serve the app from as an Allowed Callback URL **with a trailing slash** (`http://127.0.0.1:5173/` for dev), and the same values as Allowed Logout URLs and Allowed Web Origins. Scopes: `user:content:manage user:icons:manage offline_access`.
+1. Register a **public** client (PKCE) at https://dashboard.yoto.dev. Add every origin you serve the app from as an Allowed Callback URL **with a trailing slash** (`http://127.0.0.1:5173/` for dev), and the same values as Allowed Logout URLs and Allowed Web Origins. Scopes: `user:content:manage user:icons:manage family:devices:view family:devices:control offline_access` (the two device scopes power the player status and controls; drop them and everything else still works).
 2. `cp .env.example .env` and set `VITE_YOTO_CLIENT_ID`. The client id is compiled into the bundle and public by design - PKCE is what proves possession, there is no secret.
 3. `npm install`, then `npm run dev` - or `npm run build` and upload `dist/`.
 

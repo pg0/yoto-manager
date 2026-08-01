@@ -37,6 +37,7 @@ export function TrackTable() {
   const setSelectedUids = useStore((s) => s.setSelectedUids);
   const playTrack = useStore((s) => s.playTrack);
   const playingUid = useStore((s) => s.playingUid);
+  const outputBox = useStore((s) => s.outputBox);
   const uploadFiles = useStore((s) => s.uploadFiles);
   const uploads = useStore((s) => s.uploads);
   const activeCard = useStore((s) => s.activeCard());
@@ -311,10 +312,12 @@ export function TrackTable() {
                   <span className="t-num">{r.index + 1}</span>
                 </td>
                 <td className="c-play">
-                  {t.trackUrl && /^https?:\/\//.test(t.trackUrl) && (
+                  {/* a box plays from Yoto's own copy, so a track with no local
+                      stream URL is still playable when a box is the output */}
+                  {(outputBox || (t.trackUrl && /^https?:\/\//.test(t.trackUrl))) && (
                     <button
                       className={`t-play${playingUid === t.uid ? ' on' : ''}`}
-                      title={playingUid === t.uid ? 'Playing' : 'Play preview'}
+                      title={playingUid === t.uid ? 'Playing' : outputBox ? `Play on ${outputBox.name}` : 'Play preview'}
                       draggable={false}
                       onClick={(e) => {
                         e.stopPropagation();

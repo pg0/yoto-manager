@@ -1,12 +1,35 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { fmtDur } from '../lib/format';
-import { fetchDevices, type YotoDevice } from '../lib/devices';
+import type { YotoDevice } from '../lib/devices';
+import {
+  boxPlayPause,
+  boxSetVolume,
+  boxStartCard,
+  boxStop,
+  getBox,
+  livePosition,
+  volumePct,
+} from '../lib/box';
+import { useBox } from './useBox';
+import { useDevices } from './useDevices';
 
 /** Yoto's signed media URLs are used directly: <audio> plays them cross-origin
  *  without CORS, and the waveform decode below degrades to "no waveform" if the
  *  media host doesn't send CORS headers. */
 const mediaUrl = (u: string) => u;
+
+/** Radio glyph: shown on the output button while a physical box is the output. */
+function BoxIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="8" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="8.5" cy="14" r="2.6" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M14 12.5h4M14 15.5h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M8 8 17 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 /** Loudspeaker glyph for the output-device button. */
 function SpeakerIcon() {
@@ -19,6 +42,36 @@ function SpeakerIcon() {
   );
 }
 
+/**
+ * One box in the output menu. Reachability comes from the live MQTT channel,
+ * not from the device list: `/device-v2/devices/mine` does not reliably carry
+ * an `online` flag, and gating the button on it silently disabled casting.
+ */
+function CastItem({
+  device,
+  cardTitle,
+  active,
+  onPick,
+}: {
+  device: YotoDevice;
+  cardTitle: string;
+  active: boolean;
+  onPick: () => void;
+}) {
+  const live = useBox(device.deviceId);
+  const ready = live.conn === 'live';
+  return (
+    <button
+      className={`om-item${active ? ' on' : ''}`}
+      title={ready ? `Play “${cardTitle}” on ${device.name}` : `${device.name}: ${live.error ?? 'connecting…'}`}
+      onClick={onPick}
+    >
+      📻 {device.name}
+      {ready ? '' : live.conn === 'connecting' ? ' · connecting…' : ' · offline'}
+    </button>
+  );
+}
+
 /** Bottom preview player: streams the track via the media proxy, real waveform. */
 export function Player() {
   const playingUid = useStore((s) => s.playingUid);
@@ -28,21 +81,40 @@ export function Player() {
   const showToast = useStore((s) => s.showToast);
   const openCard = useStore((s) => s.openCard);
   const setSelectedUids = useStore((s) => s.setSelectedUids);
+  const outputBox = useStore((s) => s.outputBox);
+  const setOutputBox = useStore((s) => s.setOutputBox);
   // look the track up across ALL cards so playback survives switching cards
   const cards = useStore((s) => s.cards);
   const track = playingUid ? cards.flatMap((c) => c.tracks).find((t) => t.uid === playingUid) ?? null : null;
 
+  const owner = playingUid ? cards.find((c) => c.tracks.some((t) => t.uid === playingUid)) ?? null : null;
+
   // double-click the title: jump to the card this track lives on and select it
   function revealTrack() {
-    if (!playingUid) return;
-    const owner = cards.find((c) => c.tracks.some((t) => t.uid === playingUid));
-    if (!owner) return;
+    if (!playingUid || !owner) return;
     openCard(owner.id);
     setSelectedUids([playingUid]);
   }
 
+  /**
+   * Switch the bar's output to a physical box. Nothing else about the bar
+   * changes: the selected track is simply started over there instead of here.
+   * A card that only exists as a local draft has no id to hand over yet.
+   */
+  function pickBox(d: YotoDevice) {
+    setOutMenu(false);
+    if (!owner) return;
+    if (owner.id.startsWith('new_')) {
+      showToast('Publish this playlist to Yoto first, then it can play on the box');
+      return;
+    }
+    setOutputBox({ deviceId: d.deviceId, name: d.name });
+  }
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** last (box, card, chapter) actually sent, so the same start never repeats */
+  const lastCastRef = useRef<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
@@ -50,8 +122,15 @@ export function Player() {
   const [peaks, setPeaks] = useState<number[] | null>(null);
   const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
   const [sinkId, setSinkId] = useState('');
-  const [devices, setDevices] = useState<YotoDevice[]>([]);
+  const devices = useDevices();
   const [outMenu, setOutMenu] = useState(false);
+  const [, boxTick] = useState(0);
+
+  // live state of the box, when one is the output. An empty id subscribes to
+  // nothing, so this hook is safe to call unconditionally.
+  const boxLive = useBox(outputBox?.deviceId ?? '');
+  const onBox = !!outputBox;
+  const boxPlaying = boxLive.now.playbackStatus === 'playing';
 
   const streamable = track?.trackUrl && /^https?:\/\//.test(track.trackUrl) ? track.trackUrl : null;
 
@@ -64,10 +143,31 @@ export function Player() {
       .catch(() => {});
   }, []);
 
-  // list the user's Yoto players (empty if the token lacks the device scope)
+  // Hand the selected track to the box whenever either changes, and keep the
+  // browser silent so the same audio never comes out of two places.
+  //
+  // The guard is load-bearing, not defensive: StrictMode runs effects twice in
+  // dev, and the second run sees the box as already busy, so it fires the
+  // stop-then-restart path - the stop lands after the first start and kills
+  // playback. One start per (box, track) is the only correct behaviour anyway.
   useEffect(() => {
-    fetchDevices().then(setDevices);
-  }, []);
+    if (!outputBox || !owner || !track) return;
+    const req = `${outputBox.deviceId}|${owner.id}|${track.key}`;
+    if (lastCastRef.current === req) return;
+    lastCastRef.current = req;
+    audioRef.current?.pause();
+    if (!boxStartCard(outputBox.deviceId, owner.id, { chapterKey: track.key })) {
+      showToast(`${outputBox.name} isn’t reachable right now`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outputBox?.deviceId, playingUid]);
+
+  // the box reports position only when it changes, so advance it locally
+  useEffect(() => {
+    if (!onBox || !boxPlaying) return;
+    const id = window.setInterval(() => boxTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [onBox, boxPlaying]);
 
   // close the output menu on any outside interaction
   useEffect(() => {
@@ -87,13 +187,19 @@ export function Player() {
     if (a?.setSinkId && sinkId) a.setSinkId(sinkId).catch(() => {});
   }, [sinkId, playingUid]);
 
-  // spacebar (routed via the store nonce) toggles play/pause
+  // spacebar (routed via the store nonce) toggles play/pause on whatever the
+  // current output is
   useEffect(() => {
     if (playToggle === 0) return;
+    if (outputBox) {
+      boxPlayPause(outputBox.deviceId);
+      return;
+    }
     const a = audioRef.current;
     if (!a) return;
     if (a.paused) a.play().catch(() => {});
     else a.pause();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playToggle]);
 
   // mirror the playing track's icon into the browser-tab favicon; restore on stop
@@ -114,7 +220,9 @@ export function Player() {
     };
   }, [playingUid, track?.icon]);
 
-  // load + autoplay whenever the target track changes
+  // load + autoplay whenever the target track changes. With a box as the output
+  // the element is loaded but stays silent - otherwise the same track comes out
+  // of the laptop and the Yoto at once.
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !streamable) return;
@@ -122,9 +230,13 @@ export function Player() {
     a.volume = vol;
     setCur(0);
     setDur(track?.duration || 0);
+    if (outputBox) {
+      a.pause();
+      return;
+    }
     a.play().catch(() => setPlaying(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playingUid]);
+  }, [playingUid, outputBox?.deviceId]);
 
   // decode the audio into normalized peaks for the waveform
   useEffect(() => {
@@ -199,7 +311,31 @@ export function Player() {
 
   if (!track) return null;
 
+  // what the bar shows: the box's own clock when it is the output, else the
+  // <audio> element's
+  const boxPos = onBox ? livePosition(boxLive) : null;
+  const shownCur = onBox ? boxPos ?? 0 : cur;
+  const shownDur = onBox ? boxLive.now.trackLength ?? track.duration ?? 0 : dur;
+  const shownPlaying = onBox ? boxPlaying : playing;
+  // null until the box has reported its own volume. Showing 0 in the meantime
+  // is not harmless: one click on the slider would write that 0 to the box and
+  // silence it, so the control stays disabled until the real value arrives.
+  const boxVol = onBox ? volumePct(boxLive) : null;
+  const shownVol = onBox ? (boxVol ?? 0) / 100 : vol;
+  const volReady = !onBox || boxVol != null;
+
   function toggle() {
+    if (onBox && outputBox) {
+      const st = getBox(outputBox.deviceId).now.playbackStatus;
+      const ok =
+        st === 'playing' || st === 'paused'
+          ? boxPlayPause(outputBox.deviceId)
+          : owner
+            ? boxStartCard(outputBox.deviceId, owner.id, { chapterKey: track!.key })
+            : false;
+      if (!ok) showToast(`${outputBox.name} did not accept that just now`);
+      return;
+    }
     const a = audioRef.current;
     if (!a) return;
     if (a.paused) a.play().catch(() => {});
@@ -235,30 +371,36 @@ export function Player() {
           {track.title}
         </span>
       </div>
-      <button className="pl-play" onClick={toggle} title={playing ? 'Pause' : 'Play'}>
-        {playing ? '❚❚' : '▶'}
+      <button className="pl-play" onClick={toggle} title={shownPlaying ? 'Pause' : 'Play'}>
+        {shownPlaying ? '❚❚' : '▶'}
       </button>
-      <span className="pl-time">{fmtDur(Math.floor(cur))}</span>
-      <canvas className="pl-wave" ref={canvasRef} onClick={seek} title="Click to seek" />
-      <span className="pl-time">{fmtDur(Math.floor(dur))}</span>
+      <span className="pl-time">{fmtDur(Math.floor(shownCur))}</span>
+      <canvas
+        className="pl-wave"
+        ref={canvasRef}
+        onClick={seek}
+        title={onBox ? 'The player has no seek command' : 'Click to seek'}
+      />
+      <span className="pl-time">{fmtDur(Math.floor(shownDur))}</span>
       <div className="pl-outwrap">
         <button
-          className="pl-outbtn"
-          title="Output device"
+          className={`pl-outbtn${onBox ? ' on' : ''}`}
+          title={onBox ? `Playing on ${outputBox!.name}` : 'Output device'}
           onClick={(e) => {
             e.stopPropagation();
             setOutMenu((o) => !o);
           }}
         >
-          <SpeakerIcon />
+          {onBox ? <BoxIcon /> : <SpeakerIcon />}
         </button>
         {outMenu && (
           <div className="pl-outmenu" onClick={(e) => e.stopPropagation()}>
             <div className="om-sec">This browser</div>
             <button
-              className={`om-item${!sinkId ? ' on' : ''}`}
+              className={`om-item${!sinkId && !onBox ? ' on' : ''}`}
               title="Play through this browser's default audio output"
               onClick={() => {
+                setOutputBox(null);
                 setSinkId('');
                 setOutMenu(false);
               }}
@@ -270,9 +412,10 @@ export function Player() {
               .map((d, i) => (
                 <button
                   key={d.deviceId}
-                  className={`om-item${sinkId === d.deviceId ? ' on' : ''}`}
+                  className={`om-item${sinkId === d.deviceId && !onBox ? ' on' : ''}`}
                   title={d.label || 'Audio output'}
                   onClick={() => {
+                    setOutputBox(null);
                     setSinkId(d.deviceId);
                     setOutMenu(false);
                   }}
@@ -285,38 +428,46 @@ export function Player() {
               <div className="om-hint">No boxes available (needs device access)</div>
             ) : (
               devices.map((d) => (
-                <button
+                <CastItem
                   key={d.deviceId}
-                  className="om-item"
-                  title={`Cast to ${d.name}`}
-                  onClick={() => {
-                    showToast('Casting to the Yoto box is coming soon');
-                    setOutMenu(false);
-                  }}
-                >
-                  📻 {d.name}
-                  {d.online ? '' : ' · offline'}
-                </button>
+                  device={d}
+                  cardTitle={owner?.title ?? 'this playlist'}
+                  active={outputBox?.deviceId === d.deviceId}
+                  onPick={() => pickBox(d)}
+                />
               ))
             )}
           </div>
         )}
       </div>
-      <span className="pl-vol" title="Volume">🔊</span>
+      <span className="pl-vol" title={onBox ? `${outputBox!.name} volume` : 'Volume'}>🔊</span>
       <input
         className="pl-volrange"
         type="range"
         min={0}
         max={1}
         step={0.05}
-        value={vol}
+        value={shownVol}
+        disabled={!volReady}
+        title={volReady ? undefined : 'Waiting for the player to report its volume'}
         onChange={(e) => {
           const v = +e.target.value;
+          if (onBox && outputBox) {
+            boxSetVolume(outputBox.deviceId, Math.round(v * 100));
+            return;
+          }
           setVol(v);
           if (audioRef.current) audioRef.current.volume = v;
         }}
       />
-      <button className="pl-close" onClick={() => playTrack(null)} title="Close player">
+      <button
+        className="pl-close"
+        onClick={() => {
+          if (onBox && outputBox) boxStop(outputBox.deviceId);
+          playTrack(null);
+        }}
+        title="Close player"
+      >
         ✕
       </button>
     </div>
