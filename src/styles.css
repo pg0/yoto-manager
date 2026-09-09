@@ -119,6 +119,14 @@ body {
 .desc-edit:focus { outline: none; }
 .dirtytag { font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--sel-line); border-radius: 3px; padding: 2px 7px; }
 .pane-head .spacer { flex: 1; }
+/* card settings and card actions as two groups - same 14px rhythm as the loose
+   children they replaced, so the desktop row is unchanged */
+.ph-opts, .ph-actions { display: flex; align-items: center; gap: 14px; }
+/* icon-only toggle for loop / shuffle; accent-filled when the setting is on */
+.opt-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; flex: none; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink-3); cursor: pointer; }
+.opt-btn:hover { color: var(--ink); border-color: #cfcfc8; }
+.opt-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.opt-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .btn { font-family: var(--ui); font-size: 12.5px; font-weight: 600; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 4px; padding: 7px 12px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
 .btn:hover:not(:disabled) { background: #f7f7f4; }
 .btn:disabled { opacity: .4; cursor: default; }
@@ -554,7 +562,12 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
 @media (max-width: 860px) {
   .rail-toggle { display: inline-flex; }
   .app { grid-template-columns: 1fr; }
-  .topbar { grid-column: 1 / -1; gap: 8px; padding: 0 8px; }
+  /* min-width:0 is load-bearing: as a grid item the topbar defaults to
+     min-width:auto, so its nowrap content (box pill + support + sign out)
+     stretched the single 1fr column past the viewport and dragged the pane,
+     toolbar and table sideways with it. Now it scrolls on its own instead. */
+  .topbar { grid-column: 1 / -1; gap: 8px; padding: 0 8px; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  .topbar::-webkit-scrollbar { display: none; }
   .brand span { display: none; }
   /* font-size:0 collapses the "Signed in" label; the button opts back in */
   .topbar .who { gap: 6px; font-size: 0; }
@@ -576,6 +589,10 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
   .pane-title .title-edit { min-width: 0; width: 100%; }
   .pane-head .spacer { display: none; }
   .pane-head .opt-sep { display: none; }
+  /* the action buttons get their own line instead of trailing the settings row
+     and being cut off at the right edge */
+  .ph-opts { gap: 10px; }
+  .ph-actions { flex: 1 0 100%; justify-content: flex-end; gap: 8px; }
 
   /* the toolbar keeps every button, it just scrolls sideways */
   .toolbar { overflow-x: auto; flex-wrap: nowrap; padding: 8px 10px; scrollbar-width: thin; }
@@ -585,7 +602,15 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
   th.c-dur, td.c-dur, th.c-size, td.c-size { display: none; }
   th.c-num, td.c-num { width: 30px; }
   th.c-check, td.c-check { padding-left: 8px; }
-  tbody td { height: 44px; }
+  /* height on a table cell acts as a minimum, so a wrapped title grows the row */
+  tbody td { height: 44px; padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
+  /* the title wraps instead of ellipsizing: there is no horizontal scroll to
+     reveal a cut-off title, so an ellipsis just hides the name for good */
+  td.c-title { white-space: normal; }
+  .t-title {
+    white-space: normal; overflow-wrap: anywhere; line-height: 1.28;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+  }
 
   .capacity { flex-wrap: wrap; gap: 10px 16px; padding: 8px 12px; }
   .capacity .warnmsg { margin-left: 0; flex-basis: 100%; }
@@ -679,6 +704,8 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
 :root[data-theme="dark"] .hex-in { background: #1c1e22; color: var(--ink); }
 :root[data-theme="dark"] .pn-size { background: #26282d; color: var(--ink-2); }
 :root[data-theme="dark"] .end-btn { background: #26282d; color: var(--ink-2); }
+:root[data-theme="dark"] .opt-btn { background: #26282d; }
+:root[data-theme="dark"] .opt-btn:hover { border-color: #3a3d43; }
 :root[data-theme="dark"] .iconpick .ip { background: #26282d; }
 :root[data-theme="dark"] .capacity { background: #191b1e; }
 :root[data-theme="dark"] .cap .bar { background: #303237; }
