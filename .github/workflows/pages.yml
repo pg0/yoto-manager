@@ -24,6 +24,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm test
       - run: npm run build
         env:
           VITE_YOTO_CLIENT_ID: ${{ vars.VITE_YOTO_CLIENT_ID }}

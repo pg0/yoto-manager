@@ -8,6 +8,8 @@ export interface PublishResult {
   /** the token can't read the canonical content object (needs user:content:view) */
   needScope?: boolean;
   reason?: string;
+  /** local track keys no longer match the card on Yoto; the card was left untouched */
+  stale?: boolean;
   /** set when a brand-new local card was created on Yoto: its assigned cardId */
   newCardId?: string;
 }
@@ -43,6 +45,12 @@ const toIconRef = (v?: string | null): string | undefined => {
   return m ? `yoto:#${m[1]}` : undefined;
 };
 
+/** Chapter keys are re-issued from array position on every publish, so Yoto
+ *  plays the card in the order shown here. Exported because the store has to
+ *  apply the same rule to its local tracks after a publish - otherwise the next
+ *  publish looks its chapters up under keys the server no longer has. */
+export const chapterKeyFor = (i: number) => String(i).padStart(2, '0');
+
 export async function updatePlaylist(card: Card): Promise<PublishResult> {
   // brand-new local cards are CREATED (POST without cardId); existing ones need
   // the canonical read so we can preserve their yoto:# refs.
@@ -77,7 +85,7 @@ export async function updatePlaylist(card: Card): Promise<PublishResult> {
   const chapters = card.tracks.map((t, i) => {
     const orig = byKey.get(t.key);
     const origTrack = orig?.tracks?.[0];
-    const key = String(i).padStart(2, '0');
+    const key = chapterKeyFor(i);
     const overlayLabel = numbered ? String(i + 1) : undefined;
     // prefer an uploaded generated icon, then recover a ref from the stored value
     // (yoto:# ref, or a resolved icon-host URL from load/library), else keep origin
@@ -107,9 +115,26 @@ export async function updatePlaylist(card: Card): Promise<PublishResult> {
       duration: t.duration || orig?.duration || 0,
       fileSize: t.size || orig?.fileSize || 0,
       ...(display ? { display } : {}),
-      tracks: [innerTrack],
+      // a UI row is the chapter's FIRST track; any further tracks in that
+      // chapter are carried over untouched. Writing just [innerTrack] would
+      // delete them from the card - silently, on every publish.
+      tracks: [innerTrack, ...(orig?.tracks ?? []).slice(1)],
     };
   });
+
+  // Refuse to write a card that would lose audio. Every existing row has to map
+  // to a chapter in the canonical read; a row whose key is gone means our local
+  // keys drifted from the server's (a failed refetch after an earlier publish),
+  // and saving it would blank that track's media on Yoto. Newly uploaded rows
+  // carry their own yoto:# ref, so they are fine.
+  const orphans = creating ? [] : card.tracks.filter((t) => !isYotoRef(t.trackUrl) && !byKey.has(t.key));
+  if (orphans.length) {
+    return {
+      ok: false,
+      stale: true,
+      reason: `${orphans.length} track(s) no longer match this card on Yoto - reload the card and redo the edit`,
+    };
+  }
 
   // Clean payload matching the shape Yoto accepts: no createdAt/updatedAt/deleted.
   // Loop maps to content.config.autoadvance ('repeat' = loop, 'next' = continue).

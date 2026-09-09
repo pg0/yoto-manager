@@ -6,7 +6,7 @@ import { fetchCardDetail, fetchCardList, deleteCardRemote } from './lib/content'
 import { fetchNumberIcons } from './lib/icons';
 import { generateNumberIcon } from './lib/numbergen';
 import { pixelNumDataUrl, pixelNumColorsDataUrl, suggestGroups, groupIconColors } from './lib/pixelnum';
-import { updatePlaylist } from './lib/publish';
+import { updatePlaylist, chapterKeyFor } from './lib/publish';
 import { uploadAudioFile } from './lib/upload';
 
 const DRAFT_KEY = 'yoto-manager:draft:v1';
@@ -946,8 +946,13 @@ export const useStore = create<State>((set, get) => ({
       const newId = res.newCardId ?? card.id;
       const st = get();
       const numbered = card.settings.showTrackNumbers;
+      // Re-key to exactly what we just wrote. The refetch below normally does
+      // this, but it is allowed to fail quietly - and stale keys make the NEXT
+      // publish look chapters up under keys Yoto no longer has, which scrambles
+      // or blanks the card. Cheap to do here, so the drift never opens.
       const tracks = card.tracks.map((t, i) => ({
         ...t,
+        key: chapterKeyFor(i),
         overlayLabel: numbered ? String(i + 1) : undefined,
       }));
       const cards = st.cards.map((c) =>
