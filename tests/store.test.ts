@@ -127,3 +127,14 @@ describe('deleting the playlist itself', () => {
     expect(useStore.getState().cards).toHaveLength(0);
   });
 });
+
+describe('a card whose tracks never loaded', () => {
+  it('is not published - that would write an empty playlist over the real one', async () => {
+    useStore.setState({ cards: [{ ...card(), loaded: false, tracks: [], dirty: true }] });
+    await useStore.getState().publish();
+    expect(updatePlaylist).not.toHaveBeenCalled();
+    expect(active().dirty).toBe(true);
+    // the guard kicks off the missing load instead
+    expect(fetchCardDetail).toHaveBeenCalledWith('card1');
+  });
+});

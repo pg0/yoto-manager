@@ -7,6 +7,7 @@ import { TrackTable } from './components/TrackTable';
 import { CapacityMeter } from './components/CapacityMeter';
 import { Drawer } from './components/Drawer';
 import { Player } from './components/Player';
+import { listSnapshots, chapterCount, type Snapshot } from './lib/snapshots';
 
 /** Full-screen confetti + "Yay!" dialog shown after a big update. Self-contained
  *  canvas confetti (no external lib); auto-dismisses after 2s. */
@@ -142,9 +143,14 @@ function PaneHead() {
   const setCardTitle = useStore((s) => s.setCardTitle);
   const setCardDescription = useStore((s) => s.setCardDescription);
   const deleteCard = useStore((s) => s.deleteCard);
+  const restoreVersion = useStore((s) => s.restoreVersion);
+  const authed = useStore((s) => s.authed);
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmDel, setConfirmDel] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // saved versions (one is kept before every update); null = dialog closed
+  const [versions, setVersions] = useState<Snapshot[] | null>(null);
+  const [restoring, setRestoring] = useState<string | null>(null);
 
   // inline title / description editing (double-click to enter)
   const [editing, setEditing] = useState<null | 'title' | 'desc'>(null);
@@ -183,6 +189,14 @@ function PaneHead() {
     setDeleting(false);
     if (ok) setConfirmDel(false);
   }
+  async function doRestore(snap: Snapshot) {
+    setRestoring(snap.at);
+    const ok = await restoreVersion(snap);
+    setRestoring(null);
+    if (ok) setVersions(null);
+  }
+  const fmtWhen = (iso: string) =>
+    new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
   return (
     <>
@@ -281,6 +295,16 @@ function PaneHead() {
         >
           <TrashIcon />
         </button>
+        {authed && !card.id.startsWith('new_') && (
+          <button
+            className="btn ghost"
+            disabled={publishing}
+            onClick={() => setVersions(listSnapshots(card.id))}
+            title="Put the playlist back to how it was before an earlier update"
+          >
+            Versions
+          </button>
+        )}
         <button
           className="btn ghost"
           disabled={!card.dirty}
@@ -292,11 +316,48 @@ function PaneHead() {
         <button className="btn" disabled={undoLen === 0} onClick={undo} title="Undo (Ctrl+Z)">
           Undo
         </button>
-        <button className="btn primary" disabled={!card.dirty || publishing} onClick={() => void publish()}>
+        <button
+          className="btn primary"
+          disabled={!card.dirty || publishing || (!card.loaded && !card.id.startsWith('new_'))}
+          title={!card.loaded && !card.id.startsWith('new_') ? 'Tracks are still loading' : undefined}
+          onClick={() => void publish()}
+        >
           {publishing ? 'Updating…' : 'Update playlist'}
         </button>
       </div>
     </div>
+    {versions && (
+      <div className="modal-back" onClick={() => !restoring && setVersions(null)}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <h3>Saved versions</h3>
+          <p>
+            A copy of <b>{card.title}</b> is kept in this browser before every update. Restoring
+            one puts it back on Yoto; the current state is saved first, so you can restore again.
+          </p>
+          {versions.length === 0 ? (
+            <p>No saved versions yet. One is kept automatically the next time you update.</p>
+          ) : (
+            <ul className="versions">
+              {versions.map((v) => (
+                <li key={v.at}>
+                  <span>
+                    {fmtWhen(v.at)} · {chapterCount(v)} track{chapterCount(v) === 1 ? '' : 's'}
+                  </span>
+                  <button className="btn" disabled={!!restoring} onClick={() => void doRestore(v)}>
+                    {restoring === v.at ? 'Restoring…' : 'Restore'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="modal-foot">
+            <button className="btn ghost" disabled={!!restoring} onClick={() => setVersions(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     {confirmDel && (
       <div className="modal-back" onClick={() => !deleting && setConfirmDel(false)}>
         <div className="modal" onClick={(e) => e.stopPropagation()}>

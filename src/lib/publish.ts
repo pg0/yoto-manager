@@ -1,17 +1,80 @@
 import type { Card } from '../types';
-import { fetchCanonicalCard } from './content';
+import { fetchCanonicalCard, type RawCardFull } from './content';
 import { uploadDisplayIcon } from './icons';
 import { yotoFetch } from './auth';
+import { saveSnapshot, type Snapshot } from './snapshots';
 
 export interface PublishResult {
   ok: boolean;
   /** the token can't read the canonical content object (needs user:content:view) */
   needScope?: boolean;
   reason?: string;
-  /** local track keys no longer match the card on Yoto; the card was left untouched */
+  /** local state no longer matches the card on Yoto; the card was left untouched */
   stale?: boolean;
   /** set when a brand-new local card was created on Yoto: its assigned cardId */
   newCardId?: string;
+  /** the card's updatedAt after the write, when Yoto returned it */
+  updatedAt?: string;
+}
+
+/** True when `server` is a later timestamp than `local`. Unparseable or missing
+ *  values never count as newer, so a format change on Yoto's side can't lock
+ *  every save out. */
+const isNewer = (server?: string, local?: string) => {
+  if (!server || !local) return false;
+  const s = Date.parse(server);
+  const l = Date.parse(local);
+  return !Number.isNaN(s) && !Number.isNaN(l) && s > l;
+};
+
+/** Strip the read-only bookkeeping fields Yoto rejects on POST. */
+const writablePayload = (raw: RawCardFull, overrides: Record<string, unknown> = {}) => ({
+  cardId: raw.cardId,
+  title: raw.title,
+  ...(raw.slug ? { slug: raw.slug } : {}),
+  metadata: raw.metadata ?? {},
+  content: raw.content ?? {},
+  ...overrides,
+});
+
+async function postContent(payload: Record<string, unknown>): Promise<PublishResult> {
+  const res = await yotoFetch('content', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try {
+      detail = (await res.text()).slice(0, 160);
+    } catch {
+      /* ignore */
+    }
+    return { ok: false, reason: `POST /content → ${res.status} ${detail}` };
+  }
+  // Yoto echoes the stored card back; pick up the id (on create) and the new
+  // updatedAt so the next save's staleness check has the right baseline.
+  let newCardId: string | undefined;
+  let updatedAt: string | undefined;
+  try {
+    const j = (await res.json()) as { card?: { cardId?: string; updatedAt?: string }; cardId?: string };
+    newCardId = j.card?.cardId ?? j.cardId;
+    updatedAt = j.card?.updatedAt;
+  } catch {
+    /* ignore */
+  }
+  return { ok: true, ...(newCardId ? { newCardId } : {}), ...(updatedAt ? { updatedAt } : {}) };
+}
+
+/**
+ * Put a card back to a saved version (see snapshots.ts). The current state on
+ * Yoto is snapshotted first, so a restore is itself undoable.
+ */
+export async function restoreCard(snap: Snapshot): Promise<PublishResult> {
+  const current = await fetchCanonicalCard(snap.card.cardId);
+  if (!current) return { ok: false, needScope: true };
+  saveSnapshot(current);
+  return postContent(writablePayload(snap.card));
 }
 
 /** A locally-created card that has never been saved to Yoto (see store.newCard). */
@@ -57,6 +120,17 @@ export async function updatePlaylist(card: Card): Promise<PublishResult> {
   const creating = isLocalNew(card.id);
   const raw = creating ? null : await fetchCanonicalCard(card.id);
   if (!creating && !raw) return { ok: false, needScope: true };
+
+  // The write replaces the whole chapter list with what this browser shows. If
+  // the card changed on Yoto after it was opened here (edited in the Yoto app,
+  // or in another tab), those changes would be wiped - so refuse instead.
+  if (raw && isNewer(raw.updatedAt, card.updatedAt)) {
+    return {
+      ok: false,
+      stale: true,
+      reason: 'this card changed on Yoto after you opened it - reload the card and redo the edit',
+    };
+  }
 
   const origChapters = raw?.content?.chapters ?? [];
   const byKey = new Map(origChapters.map((ch) => [ch.key, ch]));
@@ -159,29 +233,9 @@ export async function updatePlaylist(card: Card): Promise<PublishResult> {
     content: { ...raw?.content, config, chapters },
   };
 
-  const res = await yotoFetch('content', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    let detail = '';
-    try {
-      detail = (await res.text()).slice(0, 160);
-    } catch {
-      /* ignore */
-    }
-    return { ok: false, reason: `POST /content → ${res.status} ${detail}` };
-  }
-  // on create, hand the store the real cardId so it can adopt it
-  let newCardId: string | undefined;
-  if (creating) {
-    try {
-      const j = (await res.json()) as { card?: { cardId?: string }; cardId?: string };
-      newCardId = j.card?.cardId ?? j.cardId;
-    } catch {
-      /* ignore */
-    }
-  }
-  return { ok: true, ...(newCardId ? { newCardId } : {}) };
+  // Last thing before the write: keep the card as Yoto had it, so a save that
+  // turns out wrong can be put back (restoreCard).
+  if (raw) saveSnapshot(raw);
+
+  return postContent(payload);
 }

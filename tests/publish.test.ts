@@ -165,3 +165,75 @@ describe('media refs', () => {
     expect(sentChapters()[0].display?.icon16x16).toBe('yoto:#uploaded-icon');
   });
 });
+
+describe('when the card changed on Yoto since it was opened', () => {
+  const canon = (updatedAt: string) =>
+    ({
+      cardId: 'card1',
+      title: 'Bedtime',
+      updatedAt,
+      content: { chapters: [chapter('00', 'One', 'aaa'), chapter('01', 'Two', 'bbb')] },
+    }) as RawCardFull;
+
+  it('refuses the write, so edits made in the Yoto app are not wiped', async () => {
+    fetchCanonicalCard.mockResolvedValue(canon('2026-09-10T12:00:00Z'));
+    const res = await updatePlaylist({ ...card([row('00', 'One')]), updatedAt: '2026-09-10T11:00:00Z' });
+    expect(res.ok).toBe(false);
+    expect(res.stale).toBe(true);
+    expect(yotoFetch).not.toHaveBeenCalled();
+  });
+
+  it('saves when the timestamp is unchanged, or when either side has none', async () => {
+    fetchCanonicalCard.mockResolvedValue(canon('2026-09-10T11:00:00Z'));
+    expect((await updatePlaylist({ ...card([row('00', 'One')]), updatedAt: '2026-09-10T11:00:00Z' })).ok).toBe(true);
+    expect((await updatePlaylist(card([row('00', 'One')]))).ok).toBe(true);
+  });
+
+  it('hands back the new updatedAt so the next save has the right baseline', async () => {
+    yotoFetch.mockResolvedValue({ ok: true, json: async () => ({ card: { cardId: 'card1', updatedAt: 'T2' } }), text: async () => '' });
+    const res = await updatePlaylist(card([row('00', 'One')]));
+    expect(res.updatedAt).toBe('T2');
+  });
+});
+
+describe('the safety copy', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('is taken right before every write, with the card as Yoto had it', async () => {
+    const { listSnapshots } = await import('../src/lib/snapshots');
+    await updatePlaylist(card([row('00', 'One')]));
+    const snaps = listSnapshots('card1');
+    expect(snaps).toHaveLength(1);
+    expect(snaps[0].card.content?.chapters?.map((c) => c.title)).toEqual(['One', 'Two', 'Three']);
+  });
+
+  it('is not taken when the write is refused', async () => {
+    const { listSnapshots } = await import('../src/lib/snapshots');
+    await updatePlaylist(card([row('99', 'Gone')]));
+    expect(listSnapshots('card1')).toHaveLength(0);
+  });
+
+  it('restores by posting the saved card back, after copying the current one', async () => {
+    const { listSnapshots, saveSnapshot } = await import('../src/lib/snapshots');
+    const { restoreCard } = await import('../src/lib/publish');
+    const old = {
+      cardId: 'card1',
+      title: 'Bedtime',
+      createdAt: 'x',
+      updatedAt: 'y',
+      content: { chapters: [chapter('00', 'One', 'aaa'), chapter('01', 'Two', 'bbb'), chapter('02', 'Three', 'ccc'), chapter('03', 'Four', 'ddd')] },
+    } as RawCardFull;
+    saveSnapshot(old);
+    const snap = listSnapshots('card1')[0];
+
+    const res = await restoreCard(snap);
+    expect(res.ok).toBe(true);
+    const body = JSON.parse(yotoFetch.mock.calls[0][1]!.body!);
+    expect(body.content.chapters.map((c: { title: string }) => c.title)).toEqual(['One', 'Two', 'Three', 'Four']);
+    expect(body.content.chapters[0].tracks[0].trackUrl).toBe('yoto:#aaa');
+    expect(body).not.toHaveProperty('createdAt');
+    expect(body).not.toHaveProperty('updatedAt');
+    // the 3-chapter card that was current is now the newest snapshot
+    expect(listSnapshots('card1')[0].card.content?.chapters).toHaveLength(3);
+  });
+});

@@ -120,6 +120,8 @@ export interface CardDetail {
   loop: boolean;
   showTrackNumbers: boolean;
   shuffle: boolean;
+  /** Yoto's updatedAt for this version; the save path refuses to overwrite a newer one */
+  updatedAt?: string;
 }
 
 /**
@@ -230,5 +232,6 @@ export async function fetchCardDetail(cardId: string): Promise<CardDetail> {
     loop: content?.config?.autoadvance === 'repeat',
     showTrackNumbers: chapters.some((ch) => !!ch.overlayLabel),
     shuffle: (content?.config?.shuffle?.length ?? 0) > 0,
+    updatedAt: card?.updatedAt,
   };
 }

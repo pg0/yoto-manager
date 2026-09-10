@@ -6,7 +6,8 @@ import { fetchCardDetail, fetchCardList, deleteCardRemote } from './lib/content'
 import { fetchNumberIcons } from './lib/icons';
 import { generateNumberIcon } from './lib/numbergen';
 import { pixelNumDataUrl, pixelNumColorsDataUrl, suggestGroups, groupIconColors } from './lib/pixelnum';
-import { updatePlaylist, chapterKeyFor } from './lib/publish';
+import { updatePlaylist, restoreCard, chapterKeyFor } from './lib/publish';
+import type { Snapshot } from './lib/snapshots';
 import { uploadAudioFile } from './lib/upload';
 
 const DRAFT_KEY = 'yoto-manager:draft:v1';
@@ -217,6 +218,8 @@ interface State {
 
   undo: () => void;
   publish: () => void;
+  /** put the card back to a version saved before an earlier update; resolves true on success */
+  restoreVersion: (snap: Snapshot) => Promise<boolean>;
   discardDraft: () => void;
   showToast: (msg: string) => void;
 }
@@ -521,6 +524,7 @@ export const useStore = create<State>((set, get) => ({
               durationSec,
               trackCount: d.tracks.length,
               settings: { showTrackNumbers: d.showTrackNumbers, loop: d.loop, shuffle: d.shuffle },
+              updatedAt: d.updatedAt ?? c.updatedAt,
               loaded: true,
             }
           : c,
@@ -570,6 +574,7 @@ export const useStore = create<State>((set, get) => ({
               durationSec,
               trackCount: d.tracks.length,
               settings: { showTrackNumbers: d.showTrackNumbers, loop: d.loop, shuffle: d.shuffle },
+              updatedAt: d.updatedAt ?? c.updatedAt,
               loaded: true,
               dirty: false,
             }
@@ -923,6 +928,14 @@ export const useStore = create<State>((set, get) => ({
       get().showToast('Sign in to Yoto to save changes');
       return;
     }
+    // A card whose tracks never arrived (detail fetch failed or still running)
+    // has an empty list here. Saving it would write that empty list over the
+    // real playlist. Fetch the tracks instead; local title/cover edits survive.
+    if (!card.loaded && !card.id.startsWith('new_')) {
+      get().showToast("This card's tracks haven't loaded yet - loading them now, then save again");
+      void get().ensureLoaded(card.id);
+      return;
+    }
     set({ publishing: true });
     try {
       const res = await updatePlaylist(card);
@@ -956,7 +969,9 @@ export const useStore = create<State>((set, get) => ({
         overlayLabel: numbered ? String(i + 1) : undefined,
       }));
       const cards = st.cards.map((c) =>
-        c.id === card.id ? { ...c, id: newId, dirty: false, loaded: true, tracks } : c,
+        c.id === card.id
+          ? { ...c, id: newId, dirty: false, loaded: true, tracks, updatedAt: res.updatedAt ?? c.updatedAt }
+          : c,
       );
       persist(cards);
       saveCardCache(cards);
@@ -974,6 +989,40 @@ export const useStore = create<State>((set, get) => ({
     } catch (e) {
       set({ publishing: false });
       get().showToast(`Update failed: ${(e as Error).message}`);
+    }
+  },
+
+  restoreVersion: async (snap) => {
+    const s = get();
+    if (!s.authed) {
+      s.showToast('Sign in to Yoto to restore a version');
+      return false;
+    }
+    set({ publishing: true });
+    try {
+      const res = await restoreCard(snap);
+      if (!res.ok) {
+        set({ publishing: false });
+        get().showToast(
+          res.needScope
+            ? 'Restoring needs content access - sign out and back in to grant it'
+            : `Restore failed: ${res.reason ?? 'unknown error'}`,
+        );
+        return false;
+      }
+      const id = snap.card.cardId;
+      const cards = get().cards.map((c) =>
+        c.id === id ? { ...c, dirty: false, updatedAt: res.updatedAt ?? c.updatedAt } : c,
+      );
+      set({ cards, publishing: false, undoStack: [], selected: new Set() });
+      // pull the restored card back so the list shows exactly what Yoto now has
+      await get().reloadCard(id);
+      get().showToast(`Restored "${snap.card.title ?? 'card'}" on Yoto`);
+      return true;
+    } catch (e) {
+      set({ publishing: false });
+      get().showToast(`Restore failed: ${(e as Error).message}`);
+      return false;
     }
   },
 
