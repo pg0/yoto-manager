@@ -6,6 +6,8 @@ Sign in with your own Yoto account; you only ever see and edit your own cards.
 
 **Use it at https://lda.io/yoto-manager/** - free, nothing to install.
 
+![yoto-manager: a 73-track card open in the editor, with the card rail, toolbar and per-track icons](docs/screenshot.png)
+
 ## What it does
 
 - Multi-select tracks and move them up, down or to the top - or sort by name or number.
