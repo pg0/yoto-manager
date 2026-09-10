@@ -718,3 +718,22 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; c
 .versions { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 6px; max-height: 40vh; overflow-y: auto; }
 .versions li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; padding: 6px 8px; border-radius: 6px; background: rgba(0,0,0,.04); }
 :root[data-theme="dark"] .versions li { background: rgba(255,255,255,.06); }
+
+/* "N selected ×" in the toolbar: the shared clear-x is absolutely positioned
+   for the search boxes; here it sits inline after the count */
+.selinfo { position: relative; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.selinfo .clear-x { position: static; transform: none; }
+.selinfo .clear-x:hover { color: var(--ink); }
+
+/* touch screens (iPad, phone): fingers need bigger targets than a 15px box and
+   a 40px row. Selection itself is additive per tap (see TOUCH_UI). */
+@media (pointer: coarse) {
+  th.c-check, td.c-check { width: 46px; padding-left: 12px; }
+  th.c-check input[type=checkbox], td.c-check input[type=checkbox] { width: 22px; height: 22px; }
+  tbody td { height: 48px; }
+  tbody tr { -webkit-tap-highlight-color: transparent; }
+  .tb { padding: 10px 12px; font-size: 13px; touch-action: manipulation; }
+  .tb.icon-only { padding: 10px 12px; font-size: 16px; }
+  .selinfo .clear-x { font-size: 20px; padding: 6px 8px; }
+  .toolbar { gap: 8px; }
+}

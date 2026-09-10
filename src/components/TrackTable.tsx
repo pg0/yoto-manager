@@ -4,6 +4,13 @@ import { fmtDur, fmtSize } from '../lib/format';
 import { DEFAULT_TRACK_ICON } from '../lib/icons';
 import type { SortKey, TrackEnd } from '../types';
 
+/** True on a touch screen (iPad, phone). There is no Ctrl or Shift key there,
+ *  so a tap on a row has to ADD to the selection rather than replace it - the
+ *  way the Files app behaves once you are picking things. An iPad with a
+ *  trackpad reports a fine pointer and keeps the desktop behaviour. */
+export const TOUCH_UI =
+  typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+
 const END_OPTS: { val: TrackEnd; label: string; glyph: string }[] = [
   { val: 'continue', label: 'Continue to next track', glyph: '→' },
   { val: 'repeat', label: 'Repeat track', glyph: '⟳' },
@@ -79,6 +86,10 @@ export function TrackTable() {
 
   function onWrapMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return;
+    // On touch a marquee can't happen (the finger scrolls), and a stray tap on
+    // blank space must not throw away a selection that took ten taps to build.
+    // The toolbar's clear button is the way out there.
+    if (TOUCH_UI) return;
     const el = e.target as HTMLElement;
     if (el.closest('input, button, a, .t-edit')) return; // interactive control
     const row = el.closest('tbody tr');
@@ -293,7 +304,7 @@ export function TrackTable() {
                 onClick={(e) => {
                   if (suppressClickRef.current) return; // click that trails a marquee
                   if ((e.target as HTMLElement).tagName !== 'INPUT') {
-                    toggleSel(t.uid, visIdx, e.shiftKey, !e.ctrlKey && !e.metaKey);
+                    toggleSel(t.uid, visIdx, e.shiftKey, !TOUCH_UI && !e.ctrlKey && !e.metaKey);
                   }
                 }}
               >

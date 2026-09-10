@@ -9,6 +9,7 @@ export function Toolbar() {
   const openDrawer = useStore((s) => s.openDrawer);
   const openIconPicker = useStore((s) => s.openIconPicker);
   const showToast = useStore((s) => s.showToast);
+  const clearSel = useStore((s) => s.clearSel);
 
   const none = selCount === 0;
 
@@ -58,7 +59,17 @@ export function Toolbar() {
       </button>
       <div className="spacer" />
       <span className="selinfo">
-        {none ? 'No selection' : <><b>{selCount}</b> selected</>}
+        {none ? (
+          'No selection'
+        ) : (
+          <>
+            <b>{selCount}</b> selected
+            {/* on touch there is no Escape key or blank-space click to clear with */}
+            <button className="clear-x" title="Clear selection (Esc)" aria-label="Clear selection" onClick={clearSel}>
+              ×
+            </button>
+          </>
+        )}
       </span>
       <div className="sep" />
       <div className="searchbox">
