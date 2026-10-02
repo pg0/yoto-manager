@@ -12,7 +12,10 @@ const uploadDisplayIcon = vi.fn(async (_dataUrl: string) => 'yoto:#uploaded-icon
 
 vi.mock('../src/lib/content', () => ({ fetchCanonicalCard: (id: string) => fetchCanonicalCard(id) }));
 vi.mock('../src/lib/auth', () => ({ yotoFetch: (p: string, init?: { body?: string }) => yotoFetch(p, init) }));
-vi.mock('../src/lib/icons', () => ({ uploadDisplayIcon: (d: string) => uploadDisplayIcon(d) }));
+vi.mock('../src/lib/icons', async (orig) => ({
+  sha256Hex: (await orig<typeof import('../src/lib/icons')>()).sha256Hex,
+  uploadDisplayIcon: (d: string) => uploadDisplayIcon(d),
+}));
 
 const { updatePlaylist } = await import('../src/lib/publish');
 
@@ -180,6 +183,24 @@ describe('cover image', () => {
 
     expect(yotoFetch.mock.calls[0][0]).toMatch(/^media\/coverImage\/user\/me\/upload/);
     expect(lastBody().metadata.cover.imageL).toBe('https://cdn.test/new.jpg');
+  });
+
+  it('names each upload after its content, so two covers never share a file', async () => {
+    yotoFetch.mockImplementation(async (path) => ({
+      ok: true,
+      json: async () => (path.startsWith('media/coverImage') ? { coverImage: { mediaUrl: 'https://cdn.test/x.jpg' } } : {}),
+      text: async () => '',
+    }));
+    await updatePlaylist(withCover('data:image/png;base64,AAA'));
+    await updatePlaylist(withCover('data:image/png;base64,BBB'));
+
+    const names = yotoFetch.mock.calls
+      .map(([p]) => p)
+      .filter((p) => p.startsWith('media/coverImage'))
+      .map((p) => new URLSearchParams(p.split('?')[1]).get('filename'));
+    expect(names).toHaveLength(2);
+    expect(names[0]).toMatch(/^cover-[0-9a-f]{16}$/);
+    expect(names[0]).not.toBe(names[1]);
   });
 
   it('keeps the cover Yoto already has when it was not changed', async () => {

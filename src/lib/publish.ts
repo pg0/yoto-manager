@@ -1,6 +1,6 @@
 import type { Card } from '../types';
 import { fetchCanonicalCard, type RawCardFull } from './content';
-import { uploadDisplayIcon } from './icons';
+import { sha256Hex, uploadDisplayIcon } from './icons';
 import { yotoFetch } from './auth';
 import { saveSnapshot, type Snapshot } from './snapshots';
 
@@ -121,10 +121,16 @@ export const chapterKeyFor = (i: number) => String(i).padStart(2, '0');
  */
 async function uploadCoverImage(dataUrl: string): Promise<string> {
   const blob = await (await fetch(dataUrl)).blob();
-  const r = await yotoFetch('media/coverImage/user/me/upload?autoconvert=true', {
+  const buf = await blob.arrayBuffer();
+  // A content-hash filename gives every distinct image its own stored file;
+  // without one, uploads can land on the same name and one card's new cover
+  // silently replaces another card's.
+  const hash = await sha256Hex(buf);
+  const params = new URLSearchParams({ autoconvert: 'true', filename: `cover-${hash.slice(0, 16)}` });
+  const r = await yotoFetch(`media/coverImage/user/me/upload?${params.toString()}`, {
     method: 'POST',
     headers: { 'content-type': blob.type || 'image/jpeg' },
-    body: await blob.arrayBuffer(),
+    body: buf,
   });
   if (!r.ok) throw new Error(`upload ${r.status}`);
   const j = (await r.json()) as { coverImage?: { mediaUrl?: string } };
