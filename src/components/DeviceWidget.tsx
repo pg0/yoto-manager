@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { fetchDeviceStatuses, type DeviceStatus } from '../lib/devices';
+import {
+  fetchDeviceStatuses,
+  saveShortcuts,
+  SHORTCUTS_MAX,
+  type DeviceStatus,
+  type ShortcutMode,
+  type Shortcuts,
+} from '../lib/devices';
 import {
   boxPlayPause,
   boxRefresh,
@@ -267,6 +274,107 @@ function NowPlaying({
 }
 
 /** One box: the topbar pill, plus the status + control popover it opens. */
+/** Green Button (4th gen players): the day and night cardless playlists.
+ *  Every add/remove writes both lists straight to Yoto; on failure it rolls back. */
+function GreenButton({ deviceId, initial }: { deviceId: string; initial: Shortcuts }) {
+  const cards = useStore((s) => s.cards);
+  const openCard = useStore((s) => s.activeCard());
+  const showToast = useStore((s) => s.showToast);
+  const [sc, setSc] = useState(initial);
+  const [mode, setMode] = useState<ShortcutMode>('day');
+  const [busy, setBusy] = useState(false);
+
+  // pick up edits made in the Yoto app (the widget re-polls every 30s)
+  const initialJson = JSON.stringify(initial);
+  useEffect(() => {
+    if (!busy) setSc(JSON.parse(initialJson) as Shortcuts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialJson]);
+
+  async function write(next: Shortcuts) {
+    const prev = sc;
+    setSc(next);
+    setBusy(true);
+    try {
+      await saveShortcuts(deviceId, next);
+    } catch (e) {
+      setSc(prev);
+      showToast(`Green Button not saved: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const list = sc[mode];
+  const title = (id: string) => cards.find((c) => c.id === id)?.title ?? `Card ${id}`;
+  const canAdd =
+    !!openCard &&
+    !openCard.id.startsWith('new_') && // not on Yoto until published
+    list.length < SHORTCUTS_MAX &&
+    !list.some((x) => x.params.card === openCard.id);
+
+  function add() {
+    if (!openCard) return;
+    // MYO chapters wrap one track keyed '01'; start at the card's first chapter
+    const item = {
+      cmd: 'track-play',
+      params: { card: openCard.id, chapter: openCard.tracks[0]?.key ?? '01', track: '01' },
+    };
+    void write({ ...sc, [mode]: [...list, item] });
+  }
+
+  return (
+    <div className="gb">
+      <div className="gb-head">
+        <span className="gb-dot" /> Green Button
+        <span className="gb-tabs">
+          {(['day', 'night'] as const).map((m) => (
+            <button key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>
+              {m === 'day' ? 'Day' : 'Night'} {sc[m].length}
+            </button>
+          ))}
+        </span>
+      </div>
+      {list.length === 0 ? (
+        <div className="gb-empty">No playlists for {mode} yet.</div>
+      ) : (
+        <ol className="gb-list">
+          {list.map((x, i) => (
+            <li key={`${x.params.card}:${i}`}>
+              <span className="gb-title">{title(x.params.card)}</span>
+              <button
+                className="clear-x"
+                disabled={busy}
+                title="Remove from Green Button"
+                aria-label="Remove from Green Button"
+                onClick={() => void write({ ...sc, [mode]: list.filter((_, j) => j !== i) })}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+      <button
+        className="gb-add"
+        disabled={busy || !canAdd}
+        onClick={add}
+        title={
+          !openCard
+            ? 'Open a card first'
+            : openCard.id.startsWith('new_')
+              ? 'Publish this card first'
+              : list.length >= SHORTCUTS_MAX
+                ? `Yoto allows ${SHORTCUTS_MAX} per list`
+                : undefined
+        }
+      >
+        {busy ? 'Saving…' : `+ Add “${openCard?.title ?? 'open card'}” to ${mode}`}
+      </button>
+    </div>
+  );
+}
+
 function DeviceRow({ d, open, onToggle }: { d: DeviceStatus; open: boolean; onToggle: () => void }) {
   const live = useBox(d.deviceId);
   const cards = useStore((s) => s.cards);
@@ -344,6 +452,7 @@ function DeviceRow({ d, open, onToggle }: { d: DeviceStatus; open: boolean; onTo
             <dt>Last seen</dt>
             <dd className="muted">{live.conn === 'live' ? 'live' : ago(d.updatedAt)}</dd>
           </dl>
+          {d.shortcuts && <GreenButton deviceId={d.deviceId} initial={d.shortcuts} />}
         </div>
       )}
     </div>

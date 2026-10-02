@@ -19,8 +19,9 @@ const CLIENT_ID = env.VITE_YOTO_CLIENT_ID ?? '';
 const SCOPES =
   env.VITE_YOTO_SCOPES ??
   // family:devices:control is what the MQTT player channel authorises against -
-  // without it the box connection is refused, everything else still works
-  'openid profile user:content:view user:content:manage user:icons:manage family:devices:view family:devices:control offline_access';
+  // without it the box connection is refused, everything else still works.
+  // family:devices:manage is what PUT /device-v2/{id}/shortcuts (Green Button) needs.
+  'openid profile user:content:view user:content:manage user:icons:manage family:devices:view family:devices:control family:devices:manage offline_access';
 
 /** Registered as an Allowed Callback URL in the Yoto dashboard. The directory
  *  the app is served from is used (not a /callback route) so plain static

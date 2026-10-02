@@ -34,7 +34,19 @@ export interface DeviceStatus {
   ssid: string | null;
   playingStatus: number | null; // raw enum; not mapped to text (unverified)
   updatedAt: string | null; // ISO, last time the box reported
+  /** Green Button playlists (4th gen players); null = box has no Green Button */
+  shortcuts: Shortcuts | null;
 }
+
+/** One Green Button entry. MYO cards are `track-play` with card/chapter/track. */
+export interface ShortcutItem {
+  cmd: string;
+  params: { card: string; chapter?: string; track?: string; [k: string]: unknown };
+}
+export type ShortcutMode = 'day' | 'night';
+export type Shortcuts = Record<ShortcutMode, ShortcutItem[]>;
+/** Yoto's per-mode cap on Green Button entries. */
+export const SHORTCUTS_MAX = 20;
 
 /**
  * GET /device-v2/{id}/config → { device: { online, deviceType, status: {…} } }.
@@ -67,6 +79,7 @@ export async function fetchDeviceStatus(deviceId: string): Promise<DeviceStatus 
       ssid: str(s.ssid),
       playingStatus: num(s.playingStatus),
       updatedAt: str(s.updatedAt),
+      shortcuts: parseShortcuts(d.shortcuts),
     };
   } catch {
     return null;
@@ -100,4 +113,26 @@ export async function fetchDevices(): Promise<YotoDevice[]> {
   } catch {
     return [];
   }
+}
+
+function parseShortcuts(raw: unknown): Shortcuts | null {
+  const modes = (raw as { modes?: Record<string, { content?: unknown }> } | undefined)?.modes;
+  if (!modes) return null;
+  const list = (m?: { content?: unknown }) =>
+    Array.isArray(m?.content) ? (m.content as ShortcutItem[]).filter((x) => x?.params?.card) : [];
+  return { day: list(modes.day), night: list(modes.night) };
+}
+
+/** PUT /device-v2/{id}/shortcuts - replaces both Green Button playlists.
+ *  Needs the family:devices:manage scope; a 403 means the login predates it. */
+export async function saveShortcuts(deviceId: string, sc: Shortcuts): Promise<void> {
+  const r = await yotoFetch(`device-v2/${encodeURIComponent(deviceId)}/shortcuts`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      shortcuts: { modes: { day: { content: sc.day }, night: { content: sc.night } } },
+    }),
+  });
+  if (r.status === 403) throw new Error('missing permission - sign out and sign in again');
+  if (!r.ok) throw new Error(`Yoto answered ${r.status}`);
 }
