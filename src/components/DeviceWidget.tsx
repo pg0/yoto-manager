@@ -5,6 +5,7 @@ import {
   saveShortcuts,
   SHORTCUTS_MAX,
   type DeviceStatus,
+  type ShortcutItem,
   type ShortcutMode,
   type Shortcuts,
 } from '../lib/devices';
@@ -274,6 +275,14 @@ function NowPlaying({
 }
 
 /** One box: the topbar pill, plus the status + control popover it opens. */
+/** Yoto's built-in card (3nC80) is not in the user's library; its chapter says
+ *  which service an entry is (shapes from the yoto.dev shortcuts examples). */
+const YOTO_CHAPTERS: Record<string, string> = {
+  daily: 'Yoto Daily',
+  'radio-day': 'Yoto Radio',
+  'radio-night': 'Yoto Radio (night)',
+};
+
 /** Green Button (4th gen players): the day and night cardless playlists.
  *  Every add/remove writes both lists straight to Yoto; on failure it rolls back. */
 function GreenButton({ deviceId, initial }: { deviceId: string; initial: Shortcuts }) {
@@ -306,7 +315,10 @@ function GreenButton({ deviceId, initial }: { deviceId: string; initial: Shortcu
   }
 
   const list = sc[mode];
-  const title = (id: string) => cards.find((c) => c.id === id)?.title ?? `Card ${id}`;
+  const title = (x: ShortcutItem) =>
+    cards.find((c) => c.id === x.params.card)?.title ??
+    YOTO_CHAPTERS[x.params.chapter ?? ''] ??
+    `Card ${x.params.card}`;
   const canAdd =
     !!openCard &&
     !openCard.id.startsWith('new_') && // not on Yoto until published
@@ -341,16 +353,18 @@ function GreenButton({ deviceId, initial }: { deviceId: string; initial: Shortcu
         <ol className="gb-list">
           {list.map((x, i) => (
             <li key={`${x.params.card}:${i}`}>
-              <span className="gb-title">{title(x.params.card)}</span>
-              <button
-                className="clear-x"
-                disabled={busy}
-                title="Remove from Green Button"
-                aria-label="Remove from Green Button"
-                onClick={() => void write({ ...sc, [mode]: list.filter((_, j) => j !== i) })}
-              >
-                ×
-              </button>
+              <div className="gb-row">
+                <span className="gb-title">{title(x)}</span>
+                <button
+                  className="gb-del"
+                  disabled={busy}
+                  title={`Remove “${title(x)}” from Green Button`}
+                  aria-label={`Remove ${title(x)} from Green Button`}
+                  onClick={() => void write({ ...sc, [mode]: list.filter((_, j) => j !== i) })}
+                >
+                  ×
+                </button>
+              </div>
             </li>
           ))}
         </ol>
