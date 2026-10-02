@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useStore } from '../store';
 
 export function Toolbar() {
@@ -8,7 +9,8 @@ export function Toolbar() {
   const removeSelected = useStore((s) => s.removeSelected);
   const openDrawer = useStore((s) => s.openDrawer);
   const openIconPicker = useStore((s) => s.openIconPicker);
-  const showToast = useStore((s) => s.showToast);
+  const uploadFiles = useStore((s) => s.uploadFiles);
+  const fileInput = useRef<HTMLInputElement>(null);
   const clearSel = useStore((s) => s.clearSel);
 
   const none = selCount === 0;
@@ -54,9 +56,21 @@ export function Toolbar() {
         </button>
       </div>
       <div className="sep" />
-      <button className="tb" onClick={() => showToast('Upload MP3 → transcode → append (backend job in M3)')}>
+      <button className="tb" onClick={() => fileInput.current?.click()}>
         ⇪ Upload MP3
       </button>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac,.aac,.opus,.aif,.aiff"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          e.target.value = ''; // allow re-picking the same file
+          if (files.length) void uploadFiles(files);
+        }}
+      />
       <div className="spacer" />
       <span className="selinfo">
         {none ? (
