@@ -8,7 +8,9 @@ import { generateNumberIcon } from './lib/numbergen';
 import { pixelNumDataUrl, pixelNumColorsDataUrl, suggestGroups, groupIconColors } from './lib/pixelnum';
 import { updatePlaylist, restoreCard, chapterKeyFor } from './lib/publish';
 import type { Snapshot } from './lib/snapshots';
-import { uploadAudioFile } from './lib/upload';
+import { uploadAudioFile, type UploadedTrack } from './lib/upload';
+
+const UPLOAD_CONCURRENCY = 4;
 
 const DRAFT_KEY = 'yoto-manager:draft:v1';
 const STATS_KEY = 'yoto-manager:stats:v1';
@@ -377,44 +379,76 @@ export const useStore = create<State>((set, get) => ({
       s.showToast('Sign in to Yoto to upload audio');
       return;
     }
-    for (const file of files) {
-      const id = `up_${Date.now()}_${Math.round(Math.random() * 1e6)}`;
-      const upd = (patch: Partial<State['uploads'][number]>) =>
-        set((st) => ({ uploads: st.uploads.map((u) => (u.id === id ? { ...u, ...patch } : u)) }));
-      set((st) => ({
-        uploads: [...st.uploads, { id, name: file.name, pct: 5, status: 'uploading' as const }],
-      }));
-      try {
-        const res = await uploadAudioFile(file, (p) =>
-          upd({ pct: p, status: p >= 55 ? 'processing' : 'uploading' }),
-        );
-        const cur = get();
-        const c = cur.cards.find((x) => x.id === card.id);
-        if (c) {
-          const track: Track = {
-            key: String(c.tracks.length).padStart(2, '0'),
-            uid: `${c.id}:new:${id}`,
-            title: file.name.replace(/\.[^.]+$/, ''),
-            duration: res.duration,
-            size: res.fileSize,
-            icon: null,
-            emoji: null,
-            trackUrl: res.trackUrl, // yoto:#<sha> - becomes playable after publish+refetch
-          };
-          const cards = cur.cards.map((x) =>
-            x.id === c.id ? { ...x, tracks: [...x.tracks, track], dirty: true } : x,
-          );
-          persist(cards);
-          set({ cards });
-        }
-        upd({ pct: 100, status: 'done' });
-        setTimeout(() => set((st) => ({ uploads: st.uploads.filter((u) => u.id !== id) })), 2500);
-      } catch (e) {
-        upd({ status: 'error' });
-        get().showToast(`Upload failed: ${(e as Error).message}`);
-        setTimeout(() => set((st) => ({ uploads: st.uploads.filter((u) => u.id !== id) })), 4000);
+    const jobs = files.map((file) => ({
+      file,
+      id: `up_${Date.now()}_${Math.round(Math.random() * 1e6)}`,
+    }));
+    set((st) => ({
+      uploads: [
+        ...st.uploads,
+        ...jobs.map((j) => ({ id: j.id, name: j.file.name, pct: 0, status: 'uploading' as const })),
+      ],
+    }));
+    const upd = (id: string, patch: Partial<State['uploads'][number]>) =>
+      set((st) => ({ uploads: st.uploads.map((u) => (u.id === id ? { ...u, ...patch } : u)) }));
+    const drop = (id: string, ms: number) =>
+      setTimeout(() => set((st) => ({ uploads: st.uploads.filter((u) => u.id !== id) })), ms);
+
+    // Uploads run in parallel and finish in any order; tracks are appended
+    // only once every earlier file has settled, so the card keeps pick order.
+    // null = that file failed and is skipped.
+    const results: (UploadedTrack | null | undefined)[] = new Array(jobs.length);
+    let flushed = 0;
+    const flush = () => {
+      const ready: { id: string; file: File; res: UploadedTrack }[] = [];
+      while (flushed < jobs.length && results[flushed] !== undefined) {
+        const res = results[flushed];
+        if (res) ready.push({ ...jobs[flushed], res });
+        flushed++;
       }
-    }
+      if (!ready.length) return;
+      const cur = get();
+      const c = cur.cards.find((x) => x.id === card.id);
+      if (!c) return;
+      const added: Track[] = ready.map(({ id, file, res }, i) => ({
+        key: String(c.tracks.length + i).padStart(2, '0'),
+        uid: `${c.id}:new:${id}`,
+        title: file.name.replace(/\.[^.]+$/, ''),
+        duration: res.duration,
+        size: res.fileSize,
+        icon: null,
+        emoji: null,
+        trackUrl: res.trackUrl, // yoto:#<sha> - becomes playable after publish+refetch
+      }));
+      const cards = cur.cards.map((x) =>
+        x.id === c.id ? { ...x, tracks: [...x.tracks, ...added], dirty: true } : x,
+      );
+      persist(cards);
+      set({ cards });
+    };
+
+    let next = 0;
+    const worker = async () => {
+      while (next < jobs.length) {
+        const i = next++;
+        const { id, file } = jobs[i];
+        try {
+          results[i] = await uploadAudioFile(file, (p) =>
+            upd(id, { pct: p, status: p >= 55 ? 'processing' : 'uploading' }),
+          );
+          upd(id, { pct: 100, status: 'done' });
+          drop(id, 2500);
+        } catch (e) {
+          results[i] = null;
+          upd(id, { status: 'error' });
+          get().showToast(`Upload failed (${file.name}): ${(e as Error).message}`);
+          drop(id, 4000);
+        }
+        flush();
+      }
+    };
+    // capped so a big batch doesn't hold every file in memory at once
+    await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, jobs.length) }, worker));
   },
 
   activeCard: () => get().cards.find((c) => c.id === get().activeId),

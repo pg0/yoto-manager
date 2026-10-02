@@ -7,6 +7,7 @@ import type { Card, Track } from '../src/types';
 
 const updatePlaylist = vi.fn<(c: Card) => Promise<{ ok: boolean; newCardId?: string }>>();
 const fetchCardDetail = vi.fn<(id: string) => Promise<unknown>>();
+const uploadAudioFile = vi.fn<(f: File) => Promise<unknown>>();
 
 vi.mock('../src/lib/publish', async (orig) => ({
   ...(await orig<typeof import('../src/lib/publish')>()),
@@ -17,6 +18,10 @@ vi.mock('../src/lib/content', () => ({
   fetchCardList: vi.fn(async () => []),
   deleteCardRemote: vi.fn(async () => undefined),
   ICON_HOST: 'https://icons.test/',
+}));
+
+vi.mock('../src/lib/upload', () => ({
+  uploadAudioFile: (f: File) => uploadAudioFile(f),
 }));
 
 const { useStore } = await import('../src/store');
@@ -136,5 +141,31 @@ describe('a card whose tracks never loaded', () => {
     expect(active().dirty).toBe(true);
     // the guard kicks off the missing load instead
     expect(fetchCardDetail).toHaveBeenCalledWith('card1');
+  });
+});
+
+describe('uploading several files', () => {
+  it('uploads them at the same time but appends in pick order, skipping failures', async () => {
+    const pending = new Map<string, { ok: (v: unknown) => void; fail: (e: Error) => void }>();
+    uploadAudioFile.mockImplementation(
+      (f) => new Promise((ok, fail) => pending.set(f.name, { ok, fail })),
+    );
+    const done = (name: string) =>
+      pending.get(name)!.ok({ trackUrl: `yoto:#${name}`, duration: 10, fileSize: 100 });
+
+    const files = ['a.mp3', 'b.mp3', 'c.mp3'].map((n) => new File(['x'], n));
+    const run = useStore.getState().uploadFiles(files);
+    await Promise.resolve();
+    expect(uploadAudioFile).toHaveBeenCalledTimes(3); // all started, not one after another
+
+    done('c.mp3');
+    await new Promise((r) => setTimeout(r));
+    expect(active().tracks).toHaveLength(3); // c waits for a and b
+
+    pending.get('b.mp3')!.fail(new Error('boom'));
+    done('a.mp3');
+    await run;
+    expect(active().tracks.map((t) => t.title)).toEqual(['One', 'Two', 'Three', 'a', 'c']);
+    expect(active().tracks.map((t) => t.key)).toEqual(['00', '01', '02', '03', '04']);
   });
 });
