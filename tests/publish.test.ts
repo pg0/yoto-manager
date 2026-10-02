@@ -166,6 +166,45 @@ describe('media refs', () => {
   });
 });
 
+describe('cover image', () => {
+  const lastBody = () => JSON.parse(yotoFetch.mock.calls[yotoFetch.mock.calls.length - 1][1]!.body!);
+  const withCover = (cover: string) => ({ ...card([row('00', 'One')]), cover });
+
+  it('uploads a newly picked cover and sends its hosted URL', async () => {
+    yotoFetch.mockImplementation(async (path) => ({
+      ok: true,
+      json: async () => (path.startsWith('media/coverImage') ? { coverImage: { mediaUrl: 'https://cdn.test/new.jpg' } } : {}),
+      text: async () => '',
+    }));
+    await updatePlaylist(withCover('data:image/png;base64,AAA'));
+
+    expect(yotoFetch.mock.calls[0][0]).toMatch(/^media\/coverImage\/user\/me\/upload/);
+    expect(lastBody().metadata.cover.imageL).toBe('https://cdn.test/new.jpg');
+  });
+
+  it('keeps the cover Yoto already has when it was not changed', async () => {
+    fetchCanonicalCard.mockResolvedValue({
+      cardId: 'card1',
+      title: 'Bedtime',
+      metadata: { cover: { imageL: 'https://cdn.test/old.jpg' } },
+      content: { chapters: [chapter('00', 'One', 'aaa')] },
+    } as RawCardFull);
+    await updatePlaylist(withCover('https://cdn.test/old.jpg'));
+
+    expect(yotoFetch).toHaveBeenCalledOnce(); // the content POST only, no upload
+    expect(lastBody().metadata.cover.imageL).toBe('https://cdn.test/old.jpg');
+  });
+
+  it('refuses to publish when the cover upload fails, instead of dropping it', async () => {
+    yotoFetch.mockResolvedValueOnce({ ok: false, status: 413, json: async () => ({}), text: async () => '' } as never);
+    const res = await updatePlaylist(withCover('data:image/png;base64,AAA'));
+
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/cover image/);
+    expect(yotoFetch).toHaveBeenCalledOnce(); // nothing written to the card
+  });
+});
+
 describe('when the card changed on Yoto since it was opened', () => {
   const canon = (updatedAt: string) =>
     ({

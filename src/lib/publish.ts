@@ -114,6 +114,25 @@ const toIconRef = (v?: string | null): string | undefined => {
  *  publish looks its chapters up under keys the server no longer has. */
 export const chapterKeyFor = (i: number) => String(i).padStart(2, '0');
 
+/**
+ * Upload a picked (data: URL) cover to Yoto and return the hosted URL that
+ * metadata.cover.imageL takes. Per yoto.dev: POST /media/coverImage/user/me/upload
+ * with the raw image bytes → { coverImage: { mediaId, mediaUrl } }.
+ */
+async function uploadCoverImage(dataUrl: string): Promise<string> {
+  const blob = await (await fetch(dataUrl)).blob();
+  const r = await yotoFetch('media/coverImage/user/me/upload?autoconvert=true', {
+    method: 'POST',
+    headers: { 'content-type': blob.type || 'image/jpeg' },
+    body: await blob.arrayBuffer(),
+  });
+  if (!r.ok) throw new Error(`upload ${r.status}`);
+  const j = (await r.json()) as { coverImage?: { mediaUrl?: string } };
+  const url = j.coverImage?.mediaUrl;
+  if (!url) throw new Error('no mediaUrl in upload response');
+  return url;
+}
+
 export async function updatePlaylist(card: Card): Promise<PublishResult> {
   // brand-new local cards are CREATED (POST without cardId); existing ones need
   // the canonical read so we can preserve their yoto:# refs.
@@ -130,6 +149,18 @@ export async function updatePlaylist(card: Card): Promise<PublishResult> {
       stale: true,
       reason: 'this card changed on Yoto after you opened it - reload the card and redo the edit',
     };
+  }
+
+  // A new cover only exists in this browser as a data: URL until it is uploaded.
+  // Failing the publish beats saving without it: a silently dropped cover is
+  // overwritten by Yoto's old one on the next reload.
+  let cover = raw?.metadata?.cover;
+  if (card.cover.startsWith('data:')) {
+    try {
+      cover = { ...cover, imageL: await uploadCoverImage(card.cover) };
+    } catch (e) {
+      return { ok: false, reason: `cover image ${(e as Error).message}` };
+    }
   }
 
   const origChapters = raw?.content?.chapters ?? [];
@@ -229,7 +260,11 @@ export async function updatePlaylist(card: Card): Promise<PublishResult> {
     ...(creating ? {} : { cardId: raw!.cardId }),
     title: card.title,
     ...(raw?.slug ? { slug: raw.slug } : {}),
-    metadata: { ...raw?.metadata, description: card.description ?? raw?.metadata?.description ?? '' },
+    metadata: {
+      ...raw?.metadata,
+      ...(cover ? { cover } : {}),
+      description: card.description ?? raw?.metadata?.description ?? '',
+    },
     content: { ...raw?.content, config, chapters },
   };
 
